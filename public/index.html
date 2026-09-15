@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191919">
+  <title>Notes</title>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="/favicon-16-dark.png" type="image/png" sizes="16x16" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/favicon-32-dark.png" type="image/png" sizes="32x32" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="mask-icon" href="/mask-icon.svg" color="#202020">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside>
+    <header><span class="brand"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="trash" title="Trash">Trash</button><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button></span></header>
+    <nav id="notes" aria-label="Notes"></nav>
+    <footer><span class="dot"></span><span class="foot-text">Public notebook</span><select id="size" aria-label="Text size"><option value="8">8 px</option><option value="10">10 px</option><option value="12">12 px</option><option value="14" selected>14 px</option><option value="16">16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option></select></footer>
+  </aside>
+  <main>
+    <div class="toolbar"><span id="status" role="status">Loading…</span><span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span><button id="bold" class="tool" title="Bold (⌘B)" aria-label="Bold">B</button><button id="italic" class="tool" title="Italic (⌘I)" aria-label="Italic">I</button><label class="tool checkbox" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label><button id="delete" class="tool">Delete</button><button id="restore" class="tool" hidden>Restore</button><button id="purge" class="tool" hidden>Delete forever</button><button id="save" class="tool">Save <kbd>⌘S</kbd></button></div>
+    <section class="editor" id="editor" data-view="split">
+      <textarea id="content" aria-label="Note content" placeholder="Start writing…" maxlength="200000" spellcheck="true"></textarea>
+      <div id="preview" aria-label="Preview"></div>
+    </section>
+  </main>
+</body>
+</html>

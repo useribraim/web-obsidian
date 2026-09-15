@@ -1,0 +1,14 @@
+{
+  "name": "ibraim-obsidian",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-11",
+  "account_id": "ea84b3f427fd457e23bf7a6a93f3f3a6",
+  "workers_dev": false,
+  "routes": [{ "pattern": "obsidian.ibraim.ie", "custom_domain": true }],
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "ibraim-obsidian-notes",
+    "database_id": "b6a2f27e-5fed-4306-87dc-a3ad8bd122a2"
+  }]
+}
