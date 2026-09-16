@@ -572,3 +572,349 @@ async function init() {
   } catch (error) { setBusy(false); message(error.message, true); }
 }
 init();
+
+// Time tracker. One entry runs at a time. Entries live in D1, so the clock
+// resumes after a reload or on another device. Totals are computed in the
+// browser's local time zone; an entry that crosses a day boundary counts
+// toward each day for the part that falls inside it.
+const task = document.querySelector('#task');
+const clock = document.querySelector('#clock');
+const toggleTimer = document.querySelector('#toggle-timer');
+const reportButton = document.querySelector('#report');
+const closeReport = document.querySelector('#close-report');
+const reportView = document.querySelector('#report-view');
+const weekChart = document.querySelector('#week-chart');
+const entriesView = document.querySelector('#entries');
+const main = document.querySelector('main');
+const sums = {
+  today: [document.querySelector('#sum-today'), document.querySelector('#report-today')],
+  week: [document.querySelector('#sum-week'), document.querySelector('#report-week')],
+  month: [document.querySelector('#sum-month'), document.querySelector('#report-month')],
+};
+
+const REFRESH_INTERVAL = 60_000;
+let entries = [];
+let running = null;
+let timerBusy = false;
+let editingId = null;
+let clockTick = null;
+
+async function timeApi(path, options) {
+  const response = await fetch('/api/time' + path, options);
+  let result = {};
+  try { result = await response.json(); } catch {}
+  if (!response.ok) throw new Error(result.error || 'Something went wrong. Please try again.');
+  return result;
+}
+function startOfDay(date) { return new Date(date.getFullYear(), date.getMonth(), date.getDate()); }
+function startOfWeek(date) {
+  const day = startOfDay(date);
+  day.setDate(day.getDate() - ((day.getDay() + 6) % 7)); // Monday
+  return day;
+}
+function startOfMonth(date) { return new Date(date.getFullYear(), date.getMonth(), 1); }
+function addDays(date, days) { const next = new Date(date); next.setDate(next.getDate() + days); return next; }
+function entryEnd(entry, now) { return entry.stopped_at ? Date.parse(entry.stopped_at) : now; }
+function overlap(entry, from, to, now) {
+  const start = Math.max(Date.parse(entry.started_at), from.getTime());
+  const end = Math.min(entryEnd(entry, now), to.getTime());
+  return Math.max(0, end - start);
+}
+function total(from, to, now) {
+  return entries.reduce((sum, entry) => sum + overlap(entry, from, to, now), 0);
+}
+function formatHours(ms) {
+  const minutes = Math.floor(ms / 60000);
+  return Math.floor(minutes / 60) + ':' + String(minutes % 60).padStart(2, '0');
+}
+function formatClock(ms) {
+  const seconds = Math.floor(ms / 1000);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function formatDay(date) {
+  return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+}
+// Value for a datetime-local input, in local time, to the minute.
+function localInputValue(iso) {
+  const date = new Date(iso);
+  const pad = value => String(value).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) +
+    'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+}
+function updateTotals() {
+  const now = Date.now();
+  const today = startOfDay(new Date());
+  const values = {
+    today: total(today, addDays(today, 1), now),
+    week: total(startOfWeek(new Date()), addDays(startOfWeek(new Date()), 7), now),
+    month: total(startOfMonth(new Date()), new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1), now),
+  };
+  for (const key of Object.keys(values)) {
+    for (const element of sums[key]) element.textContent = formatHours(values[key]);
+  }
+}
+function updateClock() {
+  clock.textContent = running ? formatClock(Date.now() - Date.parse(running.started_at)) : '0:00:00';
+  updateTotals();
+  if (running && main.dataset.page === 'report') renderRunningDurations();
+}
+function renderRunningDurations() {
+  const element = entriesView.querySelector('[data-id="' + running.id + '"] .entry-duration');
+  if (element) element.textContent = formatClock(Date.now() - Date.parse(running.started_at));
+}
+function applyRunning() {
+  running = entries.find(entry => !entry.stopped_at) || null;
+  toggleTimer.textContent = running ? 'Stop' : 'Start';
+  toggleTimer.classList.toggle('running', Boolean(running));
+  toggleTimer.disabled = timerBusy;
+  task.disabled = timerBusy;
+  if (running) {
+    if (document.activeElement !== task) task.value = running.description;
+    document.title = 'Notes — ' + (running.description || 'Timer running');
+    if (!clockTick) clockTick = setInterval(updateClock, 1000);
+  } else {
+    document.title = 'Notes';
+    clearInterval(clockTick);
+    clockTick = null;
+  }
+  updateClock();
+}
+async function loadEntries() {
+  const since = new Date(Math.min(startOfWeek(new Date()).getTime(), startOfMonth(new Date()).getTime()));
+  entries = await timeApi('?since=' + encodeURIComponent(since.toISOString()));
+  applyRunning();
+  if (main.dataset.page === 'report' && !editingId) renderReport();
+}
+async function withTimer(action) {
+  if (timerBusy) return;
+  timerBusy = true;
+  applyRunning();
+  try { await action(); }
+  catch (error) { message(error.message, true); }
+  finally { timerBusy = false; applyRunning(); }
+}
+toggleTimer.onclick = () => withTimer(async () => {
+  if (running) {
+    const stopped = await timeApi('/' + running.id + '/stop', { method: 'POST' });
+    entries = entries.map(entry => entry.id === stopped.id ? stopped : entry);
+    task.value = '';
+    message('Timer stopped');
+  } else {
+    const started = await timeApi('', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: task.value.trim() }),
+    });
+    const now = started.started_at;
+    entries = [started, ...entries.map(entry => entry.stopped_at ? entry : { ...entry, stopped_at: now })];
+    message('Timer started');
+  }
+  if (main.dataset.page === 'report') renderReport();
+});
+task.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !running) { event.preventDefault(); toggleTimer.click(); }
+});
+// A description typed while the clock runs is saved to the running entry.
+task.addEventListener('change', () => {
+  if (!running || task.value.trim() === running.description) return;
+  const id = running.id;
+  const description = task.value.trim();
+  timeApi('/' + id, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  }).then(saved => {
+    entries = entries.map(entry => entry.id === saved.id ? saved : entry);
+    applyRunning();
+    if (main.dataset.page === 'report') renderReport();
+  }).catch(error => message(error.message, true));
+});
+
+// Report page: totals, a bar per day of the current week, and the entries of
+// the current month grouped by day, newest first.
+function renderWeekChart() {
+  const now = Date.now();
+  const weekStart = startOfWeek(new Date());
+  const today = startOfDay(new Date()).getTime();
+  const days = [];
+  for (let offset = 0; offset < 7; offset += 1) {
+    const from = addDays(weekStart, offset);
+    days.push({ from, ms: total(from, addDays(from, 1), now) });
+  }
+  const max = Math.max(...days.map(day => day.ms), 1);
+  weekChart.replaceChildren();
+  for (const day of days) {
+    const bar = document.createElement('div');
+    bar.className = 'bar' + (day.from.getTime() === today ? ' today' : '');
+    const value = document.createElement('span');
+    value.className = 'bar-value';
+    value.textContent = day.ms ? formatHours(day.ms) : '';
+    const fill = document.createElement('div');
+    fill.className = 'bar-fill';
+    fill.style.height = Math.round((day.ms / max) * 100) + '%';
+    const label = document.createElement('span');
+    label.className = 'bar-label';
+    label.textContent = day.from.toLocaleDateString([], { weekday: 'short' });
+    bar.append(value, fill, label);
+    bar.title = formatDay(day.from) + ': ' + formatHours(day.ms);
+    weekChart.append(bar);
+  }
+}
+function entryRow(entry) {
+  const now = Date.now();
+  const row = document.createElement('div');
+  row.className = 'entry';
+  row.dataset.id = entry.id;
+  if (editingId === entry.id) {
+    row.classList.add('editing');
+    row.append(entryForm(entry));
+    return row;
+  }
+  const description = document.createElement('span');
+  description.className = 'entry-desc' + (entry.description ? '' : ' empty');
+  description.textContent = entry.description || 'No description';
+  description.title = entry.description;
+  const range = document.createElement('span');
+  range.className = 'entry-range';
+  range.textContent = formatTime(entry.started_at) + ' – ' + (entry.stopped_at ? formatTime(entry.stopped_at) : 'now');
+  const duration = document.createElement('span');
+  duration.className = 'entry-duration';
+  duration.textContent = entry.stopped_at ? formatHours(entryEnd(entry, now) - Date.parse(entry.started_at)) : formatClock(now - Date.parse(entry.started_at));
+  const actions = document.createElement('span');
+  actions.className = 'entry-actions';
+  if (entry.stopped_at) {
+    const edit = document.createElement('button');
+    edit.textContent = 'Edit';
+    edit.onclick = () => { editingId = entry.id; renderReport(); };
+    actions.append(edit);
+  }
+  const remove = document.createElement('button');
+  remove.className = 'danger';
+  remove.textContent = 'Delete';
+  remove.onclick = () => deleteEntry(entry);
+  actions.append(remove);
+  row.append(description, range, duration, actions);
+  return row;
+}
+function entryForm(entry) {
+  const form = document.createElement('form');
+  form.className = 'entry-form';
+  const description = document.createElement('input');
+  description.type = 'text';
+  description.value = entry.description;
+  description.maxLength = 200;
+  description.placeholder = 'Description';
+  description.setAttribute('aria-label', 'Description');
+  const started = document.createElement('input');
+  started.type = 'datetime-local';
+  started.value = localInputValue(entry.started_at);
+  started.required = true;
+  started.setAttribute('aria-label', 'Start time');
+  const stopped = document.createElement('input');
+  stopped.type = 'datetime-local';
+  stopped.value = localInputValue(entry.stopped_at);
+  stopped.required = true;
+  stopped.setAttribute('aria-label', 'Stop time');
+  const actions = document.createElement('span');
+  actions.className = 'entry-form-actions';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'tool';
+  cancel.textContent = 'Cancel';
+  cancel.onclick = () => { editingId = null; renderReport(); };
+  const saveEntry = document.createElement('button');
+  saveEntry.type = 'submit';
+  saveEntry.className = 'tool';
+  saveEntry.textContent = 'Save';
+  actions.append(cancel, saveEntry);
+  form.append(description, started, stopped, actions);
+  form.onsubmit = event => {
+    event.preventDefault();
+    const startedAt = new Date(started.value);
+    const stoppedAt = new Date(stopped.value);
+    if (Number.isNaN(startedAt.getTime()) || Number.isNaN(stoppedAt.getTime())) { message('Give the entry a valid start and stop time.', true); return; }
+    if (stoppedAt < startedAt) { message('The stop time must come after the start time.', true); return; }
+    withTimer(async () => {
+      const saved = await timeApi('/' + entry.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: description.value.trim(), started_at: startedAt.toISOString(), stopped_at: stoppedAt.toISOString() }),
+      });
+      entries = entries.map(item => item.id === saved.id ? saved : item);
+      editingId = null;
+      message('Entry saved');
+      renderReport();
+    });
+  };
+  description.focus();
+  return form;
+}
+async function deleteEntry(entry) {
+  const label = entry.description ? '"' + entry.description + '"' : 'this entry';
+  if (!confirm('Delete ' + label + '? This cannot be undone.')) return;
+  await withTimer(async () => {
+    await timeApi('/' + entry.id, { method: 'DELETE' });
+    entries = entries.filter(item => item.id !== entry.id);
+    if (editingId === entry.id) editingId = null;
+    message('Entry deleted');
+    renderReport();
+  });
+}
+function renderReport() {
+  updateTotals();
+  renderWeekChart();
+  const now = Date.now();
+  const monthStart = startOfMonth(new Date());
+  const shown = entries
+    .filter(entry => entryEnd(entry, now) >= monthStart.getTime())
+    .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at));
+  entriesView.replaceChildren();
+  if (!shown.length) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'No time tracked this month. Type a task and press Start.';
+    entriesView.append(empty);
+    return;
+  }
+  const groups = new Map();
+  for (const entry of shown) {
+    const key = startOfDay(new Date(entry.started_at)).getTime();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+  for (const [key, group] of groups) {
+    const day = new Date(key);
+    const section = document.createElement('section');
+    section.className = 'day';
+    const head = document.createElement('div');
+    head.className = 'day-head';
+    const title = document.createElement('span');
+    title.textContent = formatDay(day);
+    const sum = document.createElement('b');
+    sum.textContent = formatHours(total(day, addDays(day, 1), now));
+    head.append(title, sum);
+    section.append(head, ...group.map(entryRow));
+    entriesView.append(section);
+  }
+}
+function showReport(open) {
+  main.dataset.page = open ? 'report' : 'notes';
+  reportView.hidden = !open;
+  if (open) renderReport();
+  else editingId = null;
+}
+reportButton.onclick = () => showReport(main.dataset.page !== 'report');
+closeReport.onclick = () => showReport(false);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') loadEntries().catch(error => message(error.message, true));
+});
+setInterval(() => {
+  if (document.visibilityState === 'visible') loadEntries().catch(() => {});
+}, REFRESH_INTERVAL);
+loadEntries().catch(error => message(error.message, true));

@@ -159,6 +159,94 @@ async function parseNote(request) {
   return { title: data.title.trim() || 'Untitled note', content: data.content, version: data.version };
 }
 
+// Time entries. One entry can run at a time: starting a new one stops the
+// running one first, the way a single stopwatch would. Timestamps are stored
+// as ISO strings in UTC so string order equals time order.
+const entryQuery = 'SELECT id, description, started_at, stopped_at FROM time_entries WHERE id = ?';
+const isoTime = (value) => {
+  if (typeof value !== 'string' || value.length > 40) return null;
+  const time = Date.parse(value);
+  return Number.isNaN(time) ? null : new Date(time).toISOString();
+};
+
+async function parseEntry(request) {
+  const text = await request.text();
+  if (text.length > 4096) return { response: json({ error: 'This time entry is too large.' }, 413) };
+  let data;
+  try { data = JSON.parse(text); } catch { return { response: json({ error: 'Invalid time entry.' }, 400) }; }
+  if (!data || typeof data.description !== 'string' || data.description.length > 200) {
+    return { response: json({ error: 'Use a description under 200 characters.' }, 400) };
+  }
+  return { description: data.description.trim(), started_at: data.started_at, stopped_at: data.stopped_at };
+}
+
+async function timeResponse(request, env, url) {
+  if (!url.pathname.startsWith('/api/time')) return null;
+  if (request.method !== 'GET' && !sameOrigin(request, url)) return json({ error: 'Invalid origin.' }, 403);
+  const now = new Date().toISOString();
+
+  if (url.pathname === '/api/time' && request.method === 'GET') {
+    const since = isoTime(url.searchParams.get('since') || '1970-01-01T00:00:00.000Z');
+    if (!since) return json({ error: 'Invalid since date.' }, 400);
+    const { results } = await env.DB.prepare(
+      'SELECT id, description, started_at, stopped_at FROM time_entries WHERE stopped_at IS NULL OR stopped_at >= ? ORDER BY started_at DESC'
+    ).bind(since).all();
+    return json(results);
+  }
+
+  if (url.pathname === '/api/time' && request.method === 'POST') {
+    const data = await parseEntry(request);
+    if (data.response) return data.response;
+    const newId = crypto.randomUUID();
+    await env.DB.batch([
+      env.DB.prepare('UPDATE time_entries SET stopped_at = ? WHERE stopped_at IS NULL').bind(now),
+      env.DB.prepare('INSERT INTO time_entries (id, description, started_at) VALUES (?, ?, ?)').bind(newId, data.description, now),
+    ]);
+    return json(await env.DB.prepare(entryQuery).bind(newId).first(), 201);
+  }
+
+  const match = url.pathname.match(/^\/api\/time\/([a-f0-9-]{36})(\/stop)?$/);
+  if (!match) return json({ error: 'Not found.' }, 404);
+  const id = match[1];
+  const stop = match[2] === '/stop';
+
+  if (request.method === 'POST' && stop) {
+    const result = await env.DB.prepare('UPDATE time_entries SET stopped_at = ? WHERE id = ? AND stopped_at IS NULL').bind(now, id).run();
+    if (!result.meta.changes) {
+      const existing = await env.DB.prepare(entryQuery).bind(id).first();
+      return existing ? json(existing) : json({ error: 'Time entry not found.' }, 404);
+    }
+    return json(await env.DB.prepare(entryQuery).bind(id).first());
+  }
+
+  if (request.method === 'PUT' && !stop) {
+    const data = await parseEntry(request);
+    if (data.response) return data.response;
+    if (data.started_at === undefined && data.stopped_at === undefined) {
+      const result = await env.DB.prepare('UPDATE time_entries SET description = ? WHERE id = ?').bind(data.description, id).run();
+      if (!result.meta.changes) return json({ error: 'Time entry not found.' }, 404);
+      return json(await env.DB.prepare(entryQuery).bind(id).first());
+    }
+    const startedAt = isoTime(data.started_at);
+    const stoppedAt = isoTime(data.stopped_at);
+    if (!startedAt || !stoppedAt) return json({ error: 'Give the entry a valid start and stop time.' }, 400);
+    if (stoppedAt < startedAt) return json({ error: 'The stop time must come after the start time.' }, 400);
+    if (stoppedAt > now) return json({ error: 'The stop time cannot be in the future.' }, 400);
+    const result = await env.DB.prepare('UPDATE time_entries SET description = ?, started_at = ?, stopped_at = ? WHERE id = ?')
+      .bind(data.description, startedAt, stoppedAt, id).run();
+    if (!result.meta.changes) return json({ error: 'Time entry not found.' }, 404);
+    return json(await env.DB.prepare(entryQuery).bind(id).first());
+  }
+
+  if (request.method === 'DELETE' && !stop) {
+    const result = await env.DB.prepare('DELETE FROM time_entries WHERE id = ?').bind(id).run();
+    if (!result.meta.changes) return json({ error: 'Time entry not found.' }, 404);
+    return json({ ok: true });
+  }
+
+  return json({ error: 'Not found.' }, 404);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -172,6 +260,8 @@ export default {
         return json({ error: 'Sign in required.' }, 401);
       }
       if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+      const time = await timeResponse(request, env, url);
+      if (time) return time;
       if (url.pathname === '/api/notes' && request.method === 'GET') {
         const trash = url.searchParams.get('trash') === '1';
         const { results } = await env.DB.prepare(

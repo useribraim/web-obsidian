@@ -20,9 +20,24 @@
   <aside>
     <header><span class="brand"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="trash" title="Trash">Trash</button><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button></span></header>
     <nav id="notes" aria-label="Notes"></nav>
+    <section class="timer" aria-label="Time tracker">
+      <input id="task" type="text" placeholder="What are you working on?" maxlength="200" autocomplete="off" aria-label="Task description">
+      <div class="timer-row"><span id="clock" aria-live="off">0:00:00</span><button id="toggle-timer" class="tool">Start</button></div>
+      <button id="report" class="timer-summary" title="Open the time report"><span>Today <b id="sum-today">0:00</b></span><span>Week <b id="sum-week">0:00</b></span><span>Month <b id="sum-month">0:00</b></span></button>
+    </section>
     <footer><span class="dot"></span><span class="foot-text">Public notebook</span><select id="size" aria-label="Text size"><option value="8">8 px</option><option value="10">10 px</option><option value="12">12 px</option><option value="14" selected>14 px</option><option value="16">16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option></select></footer>
   </aside>
-  <main>
+  <main data-page="notes">
+    <section id="report-view" class="report" hidden aria-label="Time report">
+      <div class="report-head"><h2>Time report</h2><button id="close-report" class="tool">Back to notes</button></div>
+      <div class="totals">
+        <div class="total"><span class="total-label">Today</span><b id="report-today">0:00</b></div>
+        <div class="total"><span class="total-label">This week</span><b id="report-week">0:00</b></div>
+        <div class="total"><span class="total-label">This month</span><b id="report-month">0:00</b></div>
+      </div>
+      <div id="week-chart" class="week-chart" role="img" aria-label="Hours per day this week"></div>
+      <div id="entries" class="entries"></div>
+    </section>
     <div class="toolbar"><span id="status" role="status">Loading…</span><span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span><button id="bold" class="tool" title="Bold (⌘B)" aria-label="Bold">B</button><button id="italic" class="tool" title="Italic (⌘I)" aria-label="Italic">I</button><label class="tool checkbox" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label><button id="delete" class="tool">Delete</button><button id="restore" class="tool" hidden>Restore</button><button id="purge" class="tool" hidden>Delete forever</button><button id="save" class="tool">Save <kbd>⌘S</kbd></button></div>
     <section class="editor" id="editor" data-view="split">
       <textarea id="content" aria-label="Note content" placeholder="Start writing…" maxlength="200000" spellcheck="true"></textarea>
