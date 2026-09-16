@@ -1,77 +1,43 @@
-# Public notes
+# web-obsidian
 
-Minimal shared notebook at https://obsidian.ibraim.ie. Authenticated visitors can read, create, and edit notes. Edits autosave while you type (⌘S / Ctrl+S forces a save). The B/I buttons or ⌘B/⌘I wrap the selection in Markdown bold/italic; Tab inserts a tab character. Double-click a title in the sidebar to rename a note. Deleted notes move to Trash, where they can be restored or deleted forever.
+A password-protected notebook with a time tracker, at https://obsidian.ibraim.ie.
 
-The editor shows the Markdown source in a textarea beside a live preview pane, with an Edit / Split / Preview control in the toolbar: Edit shows only the source, Split shows both panes, and Preview shows only the rendered page. A Spell check tick turns the browser's spell checker on or off for the editor. Both choices are remembered in `localStorage`. The preview renders headings (`#`, `##`, `###`), bold, italic, strikethrough, inline and fenced code, bullet and numbered lists, blockquotes, horizontal rules, links and images. On narrow screens the Split option is hidden and the panes stack.
+One Cloudflare Worker, one D1 database, no build step. Everything is in
+`worker.js` and `public/`.
+
+## Notes
+
+- Markdown source on the left, live preview on the right.
+- Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
+- Double-click a title to rename. Deleted notes go to Trash.
+- A version check rejects a save that would overwrite someone else's edit.
 
 ## Time tracker
 
-The sidebar holds a stopwatch, in the style of Clockify. Type what you work on, then press Start or Enter. The clock runs until you press Stop. One entry runs at a time: starting a new entry stops the running one. A description typed while the clock runs is saved to the running entry. Entries persist in D1, so a running clock continues after a reload and shows on every device.
+- Type a task, press Start. One entry runs at a time.
+- Totals for today, this week and this month sit under the clock. Click them
+  for the report: a bar per day, and every entry of the month, editable.
+- The page sends a heartbeat every 5 minutes. If the laptop sleeps and the
+  heartbeats stop for 15 minutes, the entry ends at the last one.
 
-Under the clock, three totals show the time tracked today, this week (from Monday), and this month. Click them to open the report. The report shows the same totals, a bar for each day of the current week, and the entries of the current month grouped by day. Each finished entry has Edit, to correct the description, the start, or the stop, and Delete. While the clock runs, the page sends a heartbeat every 5 minutes. If the heartbeats stop for 15 minutes, for example because the laptop lid is closed, the entry is stopped at the last heartbeat, so the sleep is not counted. Totals use the browser's local time zone. An entry that crosses midnight counts toward each day for the part inside it.
-
-The whole site sits behind a sign-in page, matching tether.ibraim.ie. The Worker runs first for every request (`run_worker_first: true` in `wrangler.jsonc`) so the app shell and its assets are gated too, not just `/api/*`. Sessions last 12 hours in an HttpOnly, Secure, SameSite=Strict cookie. Repeated failed sign-ins are slowed down: the first three are free, then each further failure doubles the delay up to ten seconds.
-
-The site uses a shared password configured as the Cloudflare Worker secret `PASSWORD`. The password is never stored in this repository.
-
-Set the production password from this directory with:
+## Run locally
 
 ```sh
-npx wrangler secret put PASSWORD
-```
-
-Then deploy the Worker:
-
-```sh
-npx wrangler deploy
-```
-
-## Develop
-
-From this directory:
-
-```sh
+echo "PASSWORD=anything" > .dev.vars
 npx wrangler d1 execute ibraim-obsidian-notes --local --file schema.sql
 npx wrangler dev
 ```
 
-If your local database was created before soft delete existed, run the migration once instead of the schema:
-
-```sh
-npx wrangler d1 execute ibraim-obsidian-notes --local --file migrations/0001_add_deleted_at.sql
-```
-
-If it was created before the time tracker existed, run:
-
-```sh
-npx wrangler d1 execute ibraim-obsidian-notes --local --file migrations/0002_add_time_entries.sql
-```
-
-If it was created before the heartbeat existed, run:
-
-```sh
-npx wrangler d1 execute ibraim-obsidian-notes --local --file migrations/0003_add_seen_at.sql
-```
-
-## Migrate an existing database
-
-```sh
-npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0001_add_deleted_at.sql
-```
-
-```sh
-npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0002_add_time_entries.sql
-```
-
-```sh
-npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0003_add_seen_at.sql
-```
+An existing local database needs the files in `migrations/` instead of
+`schema.sql`, in order.
 
 ## Deploy
 
 ```sh
-npx wrangler d1 execute ibraim-obsidian-notes --remote --file schema.sql
+npx wrangler secret put PASSWORD     # once
+npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0003_add_seen_at.sql   # or whichever is new
 npx wrangler deploy
 ```
 
-Notes persist in D1. Version checks reject conflicting saves from simultaneous editors. The frontend renders note titles as text and shows note content as Markdown source beside a live, HTML-escaped preview.
+Sessions are a signed cookie, 12 hours. Failed sign-ins slow down after
+the third attempt.
