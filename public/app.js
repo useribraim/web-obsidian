@@ -704,7 +704,7 @@ toggleTimer.onclick = () => withTimer(async () => {
   if (running) {
     const stopped = await timeApi('/' + running.id + '/stop', { method: 'POST' });
     entries = entries.map(entry => entry.id === stopped.id ? stopped : entry);
-    task.value = '';
+    task.value = stopped.description;
     message('Timer stopped');
   } else {
     const started = await timeApi('', {
