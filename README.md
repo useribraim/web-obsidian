@@ -8,7 +8,7 @@ The editor shows the Markdown source in a textarea beside a live preview pane, w
 
 The sidebar holds a stopwatch, in the style of Clockify. Type what you work on, then press Start or Enter. The clock runs until you press Stop. One entry runs at a time: starting a new entry stops the running one. A description typed while the clock runs is saved to the running entry. Entries persist in D1, so a running clock continues after a reload and shows on every device.
 
-Under the clock, three totals show the time tracked today, this week (from Monday), and this month. Click them to open the report. The report shows the same totals, a bar for each day of the current week, and the entries of the current month grouped by day. Each finished entry has Edit, to correct the description, the start, or the stop, and Delete. Totals use the browser's local time zone. An entry that crosses midnight counts toward each day for the part inside it.
+Under the clock, three totals show the time tracked today, this week (from Monday), and this month. Click them to open the report. The report shows the same totals, a bar for each day of the current week, and the entries of the current month grouped by day. Each finished entry has Edit, to correct the description, the start, or the stop, and Delete. While the clock runs, the page sends a heartbeat every 5 minutes. If the heartbeats stop for 15 minutes, for example because the laptop lid is closed, the entry is stopped at the last heartbeat, so the sleep is not counted. Totals use the browser's local time zone. An entry that crosses midnight counts toward each day for the part inside it.
 
 The whole site sits behind a sign-in page, matching tether.ibraim.ie. The Worker runs first for every request (`run_worker_first: true` in `wrangler.jsonc`) so the app shell and its assets are gated too, not just `/api/*`. Sessions last 12 hours in an HttpOnly, Secure, SameSite=Strict cookie. Repeated failed sign-ins are slowed down: the first three are free, then each further failure doubles the delay up to ten seconds.
 
@@ -47,6 +47,12 @@ If it was created before the time tracker existed, run:
 npx wrangler d1 execute ibraim-obsidian-notes --local --file migrations/0002_add_time_entries.sql
 ```
 
+If it was created before the heartbeat existed, run:
+
+```sh
+npx wrangler d1 execute ibraim-obsidian-notes --local --file migrations/0003_add_seen_at.sql
+```
+
 ## Migrate an existing database
 
 ```sh
@@ -55,6 +61,10 @@ npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0001_ad
 
 ```sh
 npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0002_add_time_entries.sql
+```
+
+```sh
+npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0003_add_seen_at.sql
 ```
 
 ## Deploy

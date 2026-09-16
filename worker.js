@@ -163,6 +163,13 @@ async function parseNote(request) {
 // running one first, the way a single stopwatch would. Timestamps are stored
 // as ISO strings in UTC so string order equals time order.
 const entryQuery = 'SELECT id, description, started_at, stopped_at FROM time_entries WHERE id = ?';
+// The page sends a heartbeat every few minutes while the clock runs. A laptop
+// that sleeps sends none, so an entry whose last heartbeat is older than this
+// is stopped at that heartbeat before any time request is answered.
+const HEARTBEAT_TIMEOUT_MS = 15 * 60 * 1000;
+const closeStaleEntries = (env, now) => env.DB.prepare(
+  'UPDATE time_entries SET stopped_at = seen_at WHERE stopped_at IS NULL AND seen_at IS NOT NULL AND seen_at < ?'
+).bind(new Date(Date.parse(now) - HEARTBEAT_TIMEOUT_MS).toISOString()).run();
 const isoTime = (value) => {
   if (typeof value !== 'string' || value.length > 40) return null;
   const time = Date.parse(value);
@@ -184,6 +191,7 @@ async function timeResponse(request, env, url) {
   if (!url.pathname.startsWith('/api/time')) return null;
   if (request.method !== 'GET' && !sameOrigin(request, url)) return json({ error: 'Invalid origin.' }, 403);
   const now = new Date().toISOString();
+  await closeStaleEntries(env, now);
 
   if (url.pathname === '/api/time' && request.method === 'GET') {
     const since = isoTime(url.searchParams.get('since') || '1970-01-01T00:00:00.000Z');
@@ -200,15 +208,21 @@ async function timeResponse(request, env, url) {
     const newId = crypto.randomUUID();
     await env.DB.batch([
       env.DB.prepare('UPDATE time_entries SET stopped_at = ? WHERE stopped_at IS NULL').bind(now),
-      env.DB.prepare('INSERT INTO time_entries (id, description, started_at) VALUES (?, ?, ?)').bind(newId, data.description, now),
+      env.DB.prepare('INSERT INTO time_entries (id, description, started_at, seen_at) VALUES (?, ?, ?, ?)').bind(newId, data.description, now, now),
     ]);
     return json(await env.DB.prepare(entryQuery).bind(newId).first(), 201);
   }
 
-  const match = url.pathname.match(/^\/api\/time\/([a-f0-9-]{36})(\/stop)?$/);
+  const match = url.pathname.match(/^\/api\/time\/([a-f0-9-]{36})(\/stop|\/heartbeat)?$/);
   if (!match) return json({ error: 'Not found.' }, 404);
   const id = match[1];
   const stop = match[2] === '/stop';
+
+  if (request.method === 'POST' && match[2] === '/heartbeat') {
+    await env.DB.prepare('UPDATE time_entries SET seen_at = ? WHERE id = ? AND stopped_at IS NULL').bind(now, id).run();
+    const entry = await env.DB.prepare(entryQuery).bind(id).first();
+    return entry ? json(entry) : json({ error: 'Time entry not found.' }, 404);
+  }
 
   if (request.method === 'POST' && stop) {
     const result = await env.DB.prepare('UPDATE time_entries SET stopped_at = ? WHERE id = ? AND stopped_at IS NULL').bind(now, id).run();

@@ -593,6 +593,7 @@ const sums = {
 };
 
 const REFRESH_INTERVAL = 60_000;
+const HEARTBEAT_INTERVAL = 5 * 60_000;
 let entries = [];
 let running = null;
 let timerBusy = false;
@@ -917,4 +918,13 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   if (document.visibilityState === 'visible') loadEntries().catch(() => {});
 }, REFRESH_INTERVAL);
+// While the clock runs, tell the server the page is awake. A laptop that
+// sleeps sends nothing, and the server then stops the entry at the last
+// heartbeat, so the sleep is not counted as work.
+async function heartbeat() {
+  if (!running) return;
+  const updated = await timeApi('/' + running.id + '/heartbeat', { method: 'POST' });
+  if (updated.stopped_at) await loadEntries();
+}
+setInterval(() => { heartbeat().catch(() => {}); }, HEARTBEAT_INTERVAL);
 loadEntries().catch(error => message(error.message, true));
