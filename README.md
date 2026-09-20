@@ -9,8 +9,22 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 
 - Markdown source on the left, live preview on the right.
 - Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
+- ⌘L turns the current line into a task (`- [ ]`) or flips it between done
+  and not done. Click a check box in the preview to flip it there.
 - Double-click a title to rename. Deleted notes go to Trash.
 - A version check rejects a save that would overwrite someone else's edit.
+
+## Images
+
+- Click **Image**, paste a screenshot, or drop images into the editor or preview.
+- PNG, JPEG, WebP and GIF are supported. Large still images (up to 20 MB input)
+  are resized to fit the 1.5 MB storage limit; GIFs must already fit that limit.
+- Images appear in the preview; click to enlarge and press Escape to close.
+  Edit the text in `![caption](url)` to change the caption, or leave it empty.
+- Uploads are stored separately in D1 and served only to signed-in users.
+  Removing a Markdown link hides the image; the stored image is retained so
+  other notes and undo can still reference it.
+- Existing databases need `migrations/0004_add_images.sql` before deployment.
 
 ## Time tracker
 
@@ -35,7 +49,7 @@ An existing local database needs the files in `migrations/` instead of
 
 ```sh
 npx wrangler secret put PASSWORD     # once
-npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0003_add_seen_at.sql   # or whichever is new
+npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0004_add_images.sql   # or whichever is new
 npx wrangler deploy
 ```
 

@@ -25,7 +25,7 @@
       <div class="timer-row"><span id="clock" aria-live="off">0:00:00</span><button id="toggle-timer" class="tool">Start</button></div>
       <button id="report" class="timer-summary" title="Open the time report"><span>Today <b id="sum-today">0:00</b></span><span>Week <b id="sum-week">0:00</b></span><span>Month <b id="sum-month">0:00</b></span></button>
     </section>
-    <footer><span class="dot"></span><span class="foot-text">Public notebook</span><select id="size" aria-label="Text size"><option value="8">8 px</option><option value="10">10 px</option><option value="12">12 px</option><option value="14" selected>14 px</option><option value="16">16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option></select></footer>
+    <footer><span class="dot"></span><span class="foot-text">Public notebook</span><div class="size-picker"><button id="size" type="button" aria-label="Text size: 14 pixels" aria-expanded="false" aria-controls="size-options">14 px ▾</button><div id="size-options" role="group" aria-label="Text size" hidden><button type="button" data-size="8">8 px</button><button type="button" data-size="10">10 px</button><button type="button" data-size="12">12 px</button><button type="button" data-size="14">14 px</button><button type="button" data-size="16">16 px</button><button type="button" data-size="18">18 px</button><button type="button" data-size="20">20 px</button><button type="button" data-size="24">24 px</button></div></div></footer>
   </aside>
   <main data-page="notes">
     <section id="report-view" class="report" hidden aria-label="Time report">
@@ -43,6 +43,8 @@
       <textarea id="content" aria-label="Note content" placeholder="Start writing…" maxlength="200000" spellcheck="true"></textarea>
       <div id="preview" aria-label="Preview"></div>
     </section>
+    <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
   </main>
+  <dialog id="image-viewer" aria-label="Image preview"><button id="close-image" type="button" aria-label="Close image preview">Close ×</button><img id="enlarged-image" alt=""><p id="image-caption"></p></dialog>
 </body>
 </html>

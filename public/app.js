@@ -15,7 +15,14 @@ const viewButtons = [...document.querySelectorAll('.view-option')];
 const spellcheck = document.querySelector('#spellcheck');
 const size = document.querySelector('#size');
 const logout = document.querySelector('#logout');
-
+const imageFile = document.querySelector('#image-file');
+const imageButton = document.createElement('button');
+imageButton.id = 'add-image';
+imageButton.className = 'tool';
+imageButton.textContent = 'Image';
+imageButton.title = 'Upload an image, paste a screenshot, or drop an image into your note';
+document.querySelector('.toolbar').insertBefore(imageButton, deleteButton);
+let insertingImage = false;
 const AUTOSAVE_DELAY = 2500;
 let current = null;
 let notes = [];
@@ -56,17 +63,25 @@ function escapeHtml(text) {
 function safeUrl(href) {
   return /^(https?:\/\/|mailto:|\/|#)/i.test(href) ? href : '#';
 }
+function renderImage(alt, src) {
+  const url = escapeHtml(safeUrl(src));
+  const label = escapeHtml(alt);
+  return '<button type="button" class="note-image" aria-label="Enlarge image' + (alt ? ': ' + label : '') + '"><img src="' + url + '" alt="' + label + '" loading="lazy"></button>';
+}
 // Inline spans: code, images, links, emphasis and strikethrough. Input is a
 // single line of raw Markdown; HTML is escaped before anything else so note
 // content can never inject markup.
 function renderInline(text) {
   const codes = [];
   let out = escapeHtml(text).replace(/`([^`]+)`/g, (match, code) => {
-    codes.push(code);
+    codes.push('<code>' + code + '</code>');
     return '\u0000' + (codes.length - 1) + '\u0000';
   });
-  out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (match, alt, src) =>
-    '<img src="' + safeUrl(src) + '" alt="' + alt + '" loading="lazy">');
+  out = out.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (match, alt, src) => {
+    // Already escaped above; keep image markup out of the emphasis parser.
+    codes.push('<button type="button" class="note-image" aria-label="Enlarge image"><img src="' + safeUrl(src) + '" alt="' + alt + '" loading="lazy"></button>');
+    return '\u0000' + (codes.length - 1) + '\u0000';
+  });
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label, href) =>
     '<a href="' + safeUrl(href) + '" target="_blank" rel="noopener noreferrer">' + label + '</a>');
   out = out.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -76,7 +91,20 @@ function renderInline(text) {
   out = out.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   out = out.replace(/_([^_]+)_/g, '<em>$1</em>');
   out = out.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-  return out.replace(/\u0000(\d+)\u0000/g, (match, index) => '<code>' + codes[Number(index)] + '</code>');
+  return out.replace(/\u0000(\d+)\u0000/g, (match, index) => codes[Number(index)]);
+}
+// A list item that starts with [ ] or [x] is a task. Tasks are numbered in
+// document order so a click in the preview can find its source line.
+const TASK = /^(\s*(?:[-*+]|\d+[.)])\s+)\[([ xX])\](\s+.*|)$/;
+let taskCount = 0;
+function renderTask(item) {
+  const task = /^\[([ xX])\](?:\s+(.*)|)$/.exec(item);
+  if (!task) return renderInline(item);
+  const done = task[1] !== ' ';
+  const index = taskCount;
+  taskCount += 1;
+  return '<li class="task' + (done ? ' done' : '') + '"><input type="checkbox" data-task="' + index + '"' +
+    (done ? ' checked' : '') + (content.disabled ? ' disabled' : '') + '> ' + renderInline(task[2] || '') + '</li>';
 }
 // Block-level Markdown. A line-based scan keeps headings, lists, quotes and
 // fenced code from interfering with one another.
@@ -84,10 +112,17 @@ function renderMarkdown(source) {
   const lines = source.replace(/\r\n?/g, '\n').split('\n');
   const isHeading = line => /^#{1,6}\s+/.test(line);
   const isList = line => /^\s*([-*+]|\d+[.)])\s+/.test(line);
+  const imageLine = line => /^!\[([^\]]*)\]\(([^)\s]+)\)\s*$/.exec(line);
   let html = '';
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
+    const image = imageLine(line);
+    if (image) {
+      html += '<figure>' + renderImage(image[1], image[2]) + (image[1] ? '<figcaption>' + escapeHtml(image[1]) + '</figcaption>' : '') + '</figure>';
+      i += 1;
+      continue;
+    }
     if (/^```\w*\s*$/.test(line.trim())) {
       const code = [];
       i += 1;
@@ -114,14 +149,14 @@ function renderMarkdown(source) {
       const ordered = /^\s*\d+[.)]\s+/.test(line);
       const marker = ordered ? /^\s*\d+[.)]\s+/ : /^\s*[-*+]\s+/;
       const items = [];
-      while (i < lines.length && marker.test(lines[i])) { items.push(renderInline(lines[i].replace(marker, ''))); i += 1; }
+      while (i < lines.length && marker.test(lines[i])) { items.push(renderTask(lines[i].replace(marker, ''))); i += 1; }
       const tag = ordered ? 'ol' : 'ul';
-      html += '<' + tag + '>' + items.map(item => '<li>' + item + '</li>').join('') + '</' + tag + '>';
+      html += '<' + tag + '>' + items.map(item => item.startsWith('<li') ? item : '<li>' + item + '</li>').join('') + '</' + tag + '>';
       continue;
     }
     if (line.trim() === '') { i += 1; continue; }
     const paragraph = [];
-    while (i < lines.length && lines[i].trim() !== '' && !isHeading(lines[i]) && !isList(lines[i]) &&
+    while (i < lines.length && lines[i].trim() !== '' && !isHeading(lines[i]) && !isList(lines[i]) && !imageLine(lines[i]) &&
            !/^\s*>/.test(lines[i]) && !/^```\w*\s*$/.test(lines[i].trim())) {
       paragraph.push(renderInline(lines[i]));
       i += 1;
@@ -132,7 +167,66 @@ function renderMarkdown(source) {
 }
 function renderPreview() {
   if (view === 'edit') return;
+  taskCount = 0;
   preview.innerHTML = renderMarkdown(content.value);
+}
+// Offsets of every task line, in the order the preview numbers them.
+function taskLineOffsets(source) {
+  const offsets = [];
+  let offset = 0;
+  let fenced = false;
+  for (const line of source.replace(/\r\n?/g, '\n').split('\n')) {
+    const trimmed = line.trim();
+    if (fenced) { if (/^```\s*$/.test(trimmed)) fenced = false; }
+    else if (/^```\w*\s*$/.test(trimmed)) fenced = true;
+    else if (TASK.test(line.replace(/^(\s*>\s?)+/, ''))) offsets.push(offset);
+    offset += line.length + 1;
+  }
+  return offsets;
+}
+function toggleTaskLine(line) {
+  return line.replace(/\[([ xX])\]/, (match, state) => state === ' ' ? '[x]' : '[ ]');
+}
+// A click on a preview check box flips the matching source line without
+// moving the editor's focus or scroll position.
+preview.addEventListener('change', event => {
+  const box = event.target;
+  if (!box.matches('input[data-task]') || content.disabled || mode !== 'active') return;
+  const offset = taskLineOffsets(content.value)[Number(box.dataset.task)];
+  if (offset === undefined) { renderPreview(); return; }
+  const end = content.value.indexOf('\n', offset);
+  const lineEnd = end === -1 ? content.value.length : end;
+  content.setRangeText(toggleTaskLine(content.value.slice(offset, lineEnd)), offset, lineEnd, 'preserve');
+  content.dispatchEvent(new Event('input', { bubbles: true }));
+});
+// ⌘L: turn the selected lines into tasks, or flip tasks between done and
+// not done. A plain line becomes "- [ ] line"; a list item keeps its marker.
+function toggleTasks() {
+  if (content.disabled || busy || mode !== 'active') return;
+  const value = content.value;
+  const start = value.lastIndexOf('\n', content.selectionStart - 1) + 1;
+  const stop = value.indexOf('\n', content.selectionEnd);
+  const end = stop === -1 ? value.length : stop;
+  const lines = value.slice(start, end).split('\n');
+  const states = lines.map(line => { const task = TASK.exec(line); return task ? task[2] !== ' ' : null; });
+  const allTasks = states.every(state => state !== null);
+  const allDone = allTasks && states.every(Boolean);
+  const changed = lines.map((line, index) => {
+    if (states[index] !== null) {
+      if (!allTasks) return line;
+      return allDone ? line.replace(/\[[xX]\]/, '[ ]') : line.replace(/\[ \]/, '[x]');
+    }
+    const list = /^(\s*(?:[-*+]|\d+[.)])\s+)(.*)$/.exec(line);
+    if (list) return list[1] + '[ ] ' + list[2];
+    const indent = /^\s*/.exec(line)[0];
+    return indent + '- [ ] ' + line.slice(indent.length);
+  });
+  const text = changed.join('\n');
+  const single = lines.length === 1 && content.selectionStart === content.selectionEnd;
+  const caret = content.selectionStart + (changed[0].length - lines[0].length);
+  replaceSelection(text, start, end);
+  if (single) content.setSelectionRange(Math.max(start, caret), Math.max(start, caret));
+  else content.setSelectionRange(start, start + text.length);
 }
 function replaceSelection(text, start, end) {
   content.focus();
@@ -201,6 +295,8 @@ function updateControls() {
   newButton.disabled = busy;
   const readOnly = mode === 'trash' || trashed;
   bold.hidden = readOnly;
+  imageButton.hidden = readOnly;
+  imageButton.disabled = busy;
   italic.hidden = readOnly;
   bold.disabled = busy;
   italic.disabled = busy;
@@ -464,7 +560,7 @@ purgeButton.onclick = async () => {
     else { resetDraft(); message('Trash is empty.'); }
   }
 };
-content.addEventListener('input', () => {
+content.addEventListener('input', event => {
   dirty = true;
   renderPreview();
   message(blocked ? blockedMessage : 'Unsaved', blocked);
@@ -481,7 +577,8 @@ content.addEventListener('scroll', () => {
   requestAnimationFrame(() => { syncingScroll = false; });
 });
 let tabMovesFocus = false;
-content.addEventListener('keydown', event => {
+function editorKeydown(event) {
+  const content = event.currentTarget;
   if (event.key === 'Escape') { tabMovesFocus = true; return; }
   if (event.key !== 'Tab') { tabMovesFocus = false; return; }
   if (tabMovesFocus || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -500,7 +597,8 @@ content.addEventListener('keydown', event => {
     return;
   }
   replaceSelection('\t', content.selectionStart, content.selectionEnd);
-});
+}
+content.addEventListener('keydown', editorKeydown);
 content.addEventListener('blur', () => { tabMovesFocus = false; });
 bold.onclick = () => wrapSelection('**');
 italic.onclick = () => wrapSelection('*');
@@ -542,6 +640,9 @@ document.addEventListener('keydown', event => {
   } else if ((key === 'b' || key === 'i') && document.activeElement === content) {
     event.preventDefault();
     if (mode === 'active') wrapSelection(key === 'b' ? '**' : '*');
+  } else if (key === 'l' && document.activeElement === content && !event.shiftKey && !event.altKey) {
+    event.preventDefault();
+    toggleTasks();
   }
 });
 window.addEventListener('beforeunload', event => {
@@ -549,18 +650,51 @@ window.addEventListener('beforeunload', event => {
 });
 if (!/Mac|iPhone|iPad/.test(navigator.platform)) document.querySelector('kbd').textContent = 'Ctrl S';
 const SIZE_KEY = 'noteSize';
+const sizeOptions = document.querySelector('#size-options');
+const sizeChoices = [...sizeOptions.querySelectorAll('[data-size]')];
+let noteSize = '14';
 function applySize() {
-  document.documentElement.style.setProperty('--note-size', size.value + 'px');
+  document.documentElement.style.setProperty('--note-size', noteSize + 'px');
+  size.textContent = noteSize + ' px ▾';
+  size.setAttribute('aria-label', 'Text size: ' + noteSize + ' pixels');
+  for (const choice of sizeChoices) choice.setAttribute('aria-pressed', String(choice.dataset.size === noteSize));
+}
+function showSizeOptions(open, restoreFocus = false) {
+  sizeOptions.hidden = !open;
+  size.setAttribute('aria-expanded', String(open));
+  if (open) sizeChoices.find(choice => choice.dataset.size === noteSize).focus();
+  else if (restoreFocus) size.focus();
 }
 try {
   const saved = localStorage.getItem(SIZE_KEY);
-  if (saved && size.querySelector('option[value="' + saved + '"]')) size.value = saved;
+  if (sizeChoices.some(choice => choice.dataset.size === saved)) noteSize = saved;
 } catch {}
 applySize();
 renderPreview();
-size.addEventListener('change', () => {
-  applySize();
-  try { localStorage.setItem(SIZE_KEY, size.value); } catch {}
+size.onclick = () => showSizeOptions(sizeOptions.hidden);
+for (const choice of sizeChoices) {
+  choice.onclick = () => {
+    noteSize = choice.dataset.size;
+    applySize();
+    try { localStorage.setItem(SIZE_KEY, noteSize); } catch {}
+    showSizeOptions(false, true);
+  };
+}
+document.addEventListener('click', event => {
+  if (!event.target.closest('.size-picker')) showSizeOptions(false);
+});
+document.querySelector('.size-picker').addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !sizeOptions.hidden) {
+    event.preventDefault();
+    showSizeOptions(false, true);
+  } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+    event.preventDefault();
+    if (sizeOptions.hidden) { showSizeOptions(true); return; }
+    const index = sizeChoices.indexOf(document.activeElement);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? sizeChoices.length - 1
+      : (index + (event.key === 'ArrowDown' ? 1 : -1) + sizeChoices.length) % sizeChoices.length;
+    sizeChoices[next].focus();
+  }
 });
 async function init() {
   setBusy(true);
@@ -572,6 +706,122 @@ async function init() {
   } catch (error) { setBusy(false); message(error.message, true); }
 }
 init();
+
+// Images live separately from note text. Insert links only after upload succeeds.
+const MAX_IMAGE_BYTES = 1_500_000;
+async function prepareImage(file) {
+  if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) throw new Error('Use a PNG, JPEG, WebP or GIF image.');
+  if (file.size > 20_000_000) throw new Error('Choose an image smaller than 20 MB.');
+  if (file.size <= MAX_IMAGE_BYTES) return file;
+  if (file.type === 'image/gif') throw new Error('Animated GIFs must be smaller than 1.5 MB.');
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, 2400 / Math.max(image.naturalWidth, image.naturalHeight));
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext('2d');
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', attempt ? .8 : .92));
+      if (blob && blob.size <= MAX_IMAGE_BYTES) return blob;
+      canvas.width = Math.max(1, Math.round(canvas.width * .75));
+      canvas.height = Math.max(1, Math.round(canvas.height * .75));
+    }
+    throw new Error('This image is too large. Try a smaller version.');
+  } finally { URL.revokeObjectURL(url); }
+}
+async function uploadImages(files) {
+  if (!files.length || busy || content.disabled || mode !== 'active') return;
+  const start = content.selectionStart;
+  const end = content.selectionEnd;
+  const links = [];
+  let failure = '';
+  setBusy(true);
+  try {
+    for (let index = 0; index < files.length; index += 1) {
+      message('Uploading image ' + (index + 1) + ' of ' + files.length + '…');
+      const image = await prepareImage(files[index]);
+      const response = await fetch('/api/images', { method: 'POST', headers: { 'Content-Type': image.type }, body: image });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Image upload failed. Please try again.');
+      const caption = files[index].name.replace(/\.[^.]+$/, '').replace(/[\[\]\\\r\n]/g, ' ').trim().slice(0, 120);
+      links.push('![' + caption + '](' + result.url + ')');
+    }
+  } catch (error) { failure = error.message || 'Image upload failed. Please try again.'; }
+  finally { setBusy(false); }
+  if (links.length) {
+    const markdown = '\n\n' + links.join('\n\n') + '\n\n';
+    if (content.value.length - (end - start) + markdown.length > content.maxLength) {
+      message('This note is full. Make room before adding images.', true);
+      return;
+    }
+    insertingImage = true;
+    try { replaceSelection(markdown, start, end); }
+    finally { insertingImage = false; }
+    view = window.matchMedia('(max-width: 600px)').matches ? 'preview' : 'split';
+    applyView();
+  }
+  if (failure) message(failure, true);
+}
+imageButton.onclick = () => imageFile.click();
+imageFile.onchange = () => {
+  const files = [...imageFile.files];
+  imageFile.value = '';
+  uploadImages(files);
+};
+content.addEventListener('paste', event => {
+  const files = [...(event.clipboardData?.files || [])];
+  if (!files.length) return;
+  event.preventDefault();
+  uploadImages(files);
+});
+editor.addEventListener('dragover', event => {
+  if (![...event.dataTransfer.types].includes('Files')) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = busy || content.disabled ? 'none' : 'copy';
+  if (!busy && !content.disabled) editor.classList.add('image-drop');
+});
+editor.addEventListener('dragleave', event => {
+  if (!editor.contains(event.relatedTarget)) editor.classList.remove('image-drop');
+});
+editor.addEventListener('drop', event => {
+  editor.classList.remove('image-drop');
+  const files = [...event.dataTransfer.files];
+  if (!files.length) return;
+  event.preventDefault();
+  uploadImages(files);
+});
+// A missed drop should never navigate away from an unsaved note.
+for (const type of ['dragover', 'drop']) document.addEventListener(type, event => {
+  if ([...event.dataTransfer.types].includes('Files')) event.preventDefault();
+});
+const imageViewer = document.querySelector('#image-viewer');
+const enlargedImage = document.querySelector('#enlarged-image');
+preview.addEventListener('click', event => {
+  const button = event.target.closest('.note-image');
+  if (!button) return;
+  const image = button.querySelector('img');
+  enlargedImage.src = image.src;
+  enlargedImage.alt = image.alt;
+  document.querySelector('#image-caption').textContent = image.alt;
+  imageViewer.showModal();
+});
+document.querySelector('#close-image').onclick = () => imageViewer.close();
+imageViewer.addEventListener('click', event => { if (event.target === imageViewer) imageViewer.close(); });
+imageViewer.addEventListener('close', () => enlargedImage.removeAttribute('src'));
+preview.addEventListener('error', event => {
+  if (event.target.tagName !== 'IMG') return;
+  const button = event.target.closest('.note-image');
+  if (!button || button.querySelector('.image-error')) return;
+  const error = document.createElement('span');
+  error.className = 'image-error';
+  error.textContent = 'Image unavailable';
+  button.append(error);
+}, true);
 
 // Time tracker. One entry runs at a time. Entries live in D1, so the clock
 // resumes after a reload or on another device. Totals are computed in the

@@ -261,6 +261,54 @@ async function timeResponse(request, env, url) {
   return json({ error: 'Not found.' }, 404);
 }
 
+const IMAGE_LIMIT = 1_500_000;
+function imageType(bytes) {
+  const starts = signature => signature.every((value, index) => bytes[index] === value);
+  if (starts([137, 80, 78, 71, 13, 10, 26, 10])) return 'image/png';
+  if (starts([255, 216, 255])) return 'image/jpeg';
+  const text = new TextDecoder().decode(bytes.slice(0, 12));
+  if (/^GIF8[79]a/.test(text)) return 'image/gif';
+  if (text.startsWith('RIFF') && text.slice(8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}
+async function imageResponse(request, env, url) {
+  if (url.pathname === '/api/images' && request.method === 'POST') {
+    if (!sameOrigin(request, url)) return json({ error: 'Invalid origin.' }, 403);
+    if (Number(request.headers.get('Content-Length')) > IMAGE_LIMIT) return json({ error: 'Image is too large. Please use a smaller image.' }, 413);
+    if (!request.body) return json({ error: 'Choose an image to upload.' }, 400);
+    const reader = request.body.getReader();
+    const chunks = [];
+    let length = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > IMAGE_LIMIT) {
+        await reader.cancel();
+        return json({ error: 'Image is too large. Please use a smaller image.' }, 413);
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    const type = imageType(bytes);
+    if (!type) return json({ error: 'Use a PNG, JPEG, WebP or GIF image.' }, 415);
+    const id = crypto.randomUUID();
+    await env.DB.prepare('INSERT INTO images (id, content_type, data) VALUES (?, ?, ?)').bind(id, type, bytes.buffer).run();
+    return json({ url: '/api/images/' + id }, 201);
+  }
+  const match = /^\/api\/images\/([a-f0-9-]{36})$/.exec(url.pathname);
+  if (match && (request.method === 'GET' || request.method === 'HEAD')) {
+    const image = await env.DB.prepare('SELECT content_type, data FROM images WHERE id = ?').bind(match[1]).first();
+    if (!image) return json({ error: 'Image not found.' }, 404);
+    return new Response(request.method === 'HEAD' ? null : new Uint8Array(image.data), {
+      headers: { 'Content-Type': image.content_type, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' },
+    });
+  }
+  return null;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -274,6 +322,8 @@ export default {
         return json({ error: 'Sign in required.' }, 401);
       }
       if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+      const image = await imageResponse(request, env, url);
+      if (image) return image;
       const time = await timeResponse(request, env, url);
       if (time) return time;
       if (url.pathname === '/api/notes' && request.method === 'GET') {
