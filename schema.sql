@@ -14,3 +14,9 @@ CREATE TABLE IF NOT EXISTS time_entries (
   seen_at TEXT
 );
 CREATE INDEX IF NOT EXISTS time_entries_started_at ON time_entries (started_at);
+CREATE TABLE IF NOT EXISTS images (
+  id TEXT PRIMARY KEY,
+  content_type TEXT NOT NULL,
+  data BLOB NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
