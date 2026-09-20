@@ -47,6 +47,13 @@ An existing local database needs the files in `migrations/` instead of
 
 ## Deploy
 
+A push to `main` runs `.github/workflows/deploy.yml`. The workflow applies
+the migrations it lists, then deploys the Worker. It needs one repository
+secret, `CLOUDFLARE_API_TOKEN`, with the Workers Scripts and D1 edit
+permissions. Add a new migration file to the workflow list when you add one.
+
+To deploy by hand instead:
+
 ```sh
 npx wrangler secret put PASSWORD     # once
 npx wrangler d1 execute ibraim-obsidian-notes --remote --file migrations/0004_add_images.sql   # or whichever is new
