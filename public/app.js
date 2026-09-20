@@ -97,14 +97,34 @@ function renderInline(text) {
 // document order so a click in the preview can find its source line.
 const TASK = /^(\s*(?:[-*+]|\d+[.)])\s+)\[([ xX])\](\s+.*|)$/;
 let taskCount = 0;
-function renderTask(item) {
+function renderItem(item) {
   const task = /^\[([ xX])\](?:\s+(.*)|)$/.exec(item);
-  if (!task) return renderInline(item);
+  if (!task) return '<li>' + renderInline(item);
   const done = task[1] !== ' ';
   const index = taskCount;
   taskCount += 1;
   return '<li class="task' + (done ? ' done' : '') + '"><input type="checkbox" data-task="' + index + '"' +
-    (done ? ' checked' : '') + (content.disabled ? ' disabled' : '') + '> ' + renderInline(task[2] || '') + '</li>';
+    (done ? ' checked' : '') + (content.disabled ? ' disabled' : '') + '> ' + renderInline(task[2] || '');
+}
+// A run of list lines. Deeper indentation (a tab, or two spaces) opens a
+// nested list inside the item above it.
+function renderList(lines) {
+  let html = '';
+  const open = [];
+  for (const line of lines) {
+    const parts = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(line);
+    const depth = parts[1].replace(/\t/g, '  ').length;
+    const tag = /^\d/.test(parts[2]) ? 'ol' : 'ul';
+    while (open.length && depth < open[open.length - 1].depth) html += '</li></' + open.pop().tag + '>';
+    if (open.length && depth === open[open.length - 1].depth && tag !== open[open.length - 1].tag) html += '</li></' + open.pop().tag + '>';
+    if (!open.length || depth > open[open.length - 1].depth) {
+      html += '<' + tag + '>';
+      open.push({ depth, tag });
+    } else html += '</li>';
+    html += renderItem(parts[3]);
+  }
+  while (open.length) html += '</li></' + open.pop().tag + '>';
+  return html;
 }
 // Block-level Markdown. A line-based scan keeps headings, lists, quotes and
 // fenced code from interfering with one another.
@@ -146,12 +166,9 @@ function renderMarkdown(source) {
       continue;
     }
     if (isList(line)) {
-      const ordered = /^\s*\d+[.)]\s+/.test(line);
-      const marker = ordered ? /^\s*\d+[.)]\s+/ : /^\s*[-*+]\s+/;
       const items = [];
-      while (i < lines.length && marker.test(lines[i])) { items.push(renderTask(lines[i].replace(marker, ''))); i += 1; }
-      const tag = ordered ? 'ol' : 'ul';
-      html += '<' + tag + '>' + items.map(item => item.startsWith('<li') ? item : '<li>' + item + '</li>').join('') + '</' + tag + '>';
+      while (i < lines.length && isList(lines[i])) { items.push(lines[i]); i += 1; }
+      html += renderList(items);
       continue;
     }
     if (line.trim() === '') { i += 1; continue; }
@@ -381,6 +398,7 @@ function setBusy(value) {
   render();
 }
 function resetDraft() {
+  showReport(false);
   clearTimeout(timer);
   current = null;
   content.value = '';
@@ -392,6 +410,7 @@ function resetDraft() {
   render();
 }
 function show(note) {
+  showReport(false);
   current = note;
   content.value = note.content;
   renderPreview();
@@ -1162,6 +1181,14 @@ function showReport(open) {
 }
 reportButton.onclick = () => showReport(main.dataset.page !== 'report');
 closeReport.onclick = () => showReport(false);
+// Escape leaves the report, or an entry form inside it, and returns to the note.
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || main.dataset.page !== 'report' || event.isComposing) return;
+  event.preventDefault();
+  if (editingId) { editingId = null; renderReport(); return; }
+  showReport(false);
+  reportButton.focus();
+});
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') loadEntries().catch(error => message(error.message, true));
 });

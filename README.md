@@ -8,6 +8,8 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 ## Notes
 
 - Markdown source on the left, live preview on the right.
+- Tab indents. An indented list line nests under the line above it, and an
+  indented paragraph keeps its indent in the preview.
 - Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
 - ⌘L turns the current line into a task (`- [ ]`) or flips it between done
   and not done. Click a check box in the preview to flip it there.
@@ -31,6 +33,7 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - Type a task, press Start. One entry runs at a time.
 - Totals for today, this week and this month sit under the clock. Click them
   for the report: a bar per day, and every entry of the month, editable.
+  Escape, **Back to notes**, or a click on a note closes the report.
 - The page sends a heartbeat every 5 minutes. If the laptop sleeps and the
   heartbeats stop for 15 minutes, the entry ends at the last one.
 

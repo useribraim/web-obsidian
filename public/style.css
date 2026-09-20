@@ -63,8 +63,9 @@ input, textarea { color: #d4d4d4; background: transparent; border: 0; outline: n
 #preview h2 { font-size: 1.5em; }
 #preview h3 { font-size: 1.25em; }
 #preview h4, #preview h5, #preview h6 { font-size: 1.05em; color: #b9b2c9; }
-#preview p { margin: 0 0 .75em; }
+#preview p { margin: 0 0 .75em; white-space: pre-wrap; tab-size: 2; }
 #preview ul, #preview ol { margin: 0 0 .75em; padding-left: 1.5em; }
+#preview li > ul, #preview li > ol { margin: .2em 0 0; }
 #preview li { margin: .2em 0; }
 #preview li.task { list-style: none; margin-left: -1.5em; }
 #preview li.task input { width: 1em; height: 1em; margin: 0 .5em 0 0; vertical-align: -.1em; accent-color: #a899ce; cursor: pointer; }
