@@ -15,6 +15,8 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
   and not done. Click a check box in the preview to flip it there.
 - Tick **Focus** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
+- Tick **Compact** to fold the day headings (`### 9/11`) of earlier weeks into
+  one line per week. The current week stays open, and the source scrolls to it.
 - Double-click a title to rename. Deleted notes go to Trash.
 - A version check rejects a save that would overwrite someone else's edit.
 

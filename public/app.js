@@ -13,6 +13,7 @@ const bold = document.querySelector('#bold');
 const italic = document.querySelector('#italic');
 const viewButtons = [...document.querySelectorAll('.view-option')];
 const spellcheck = document.querySelector('#spellcheck');
+const compactMode = document.querySelector('#compact-mode');
 const size = document.querySelector('#size');
 const logout = document.querySelector('#logout');
 const imageFile = document.querySelector('#image-file');
@@ -186,6 +187,83 @@ function renderPreview() {
   if (editor.dataset.view === 'edit') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(content.value);
+  if (compactMode.checked) foldEarlierWeeks();
+}
+// Compact mode folds the day headings ("### 9/11") of every earlier week into
+// one closed line per week, so only the current week stays open. Headings
+// carry no year; a date more than six months ahead belongs to last year.
+const DAY_HEADING = /^(\d{1,2})\/(\d{1,2})(?!\d)/;
+const openWeeks = new Set();
+function dayDate(text) {
+  const match = DAY_HEADING.exec(text.trim());
+  if (!match) return null;
+  const today = new Date();
+  const month = Number(match[1]) - 1;
+  const date = new Date(today.getFullYear(), month, Number(match[2]));
+  if (date.getMonth() !== month) return null;
+  if (date - today > 183 * 86400000) date.setFullYear(date.getFullYear() - 1);
+  return date;
+}
+function foldEarlierWeeks() {
+  const thisWeek = startOfWeek(new Date()).getTime();
+  const groups = [];
+  let group = null;
+  for (const node of [...preview.children]) {
+    const date = /^H[1-6]$/.test(node.tagName) ? dayDate(node.textContent) : null;
+    if (date) {
+      const week = startOfWeek(date).getTime();
+      if (week >= thisWeek) group = null;
+      else if (!group || group.week !== week) {
+        const details = document.createElement('details');
+        details.className = 'week-fold';
+        details.dataset.week = week;
+        details.open = openWeeks.has(week);
+        details.append(document.createElement('summary'));
+        node.before(details);
+        group = { week, details, days: 0 };
+        groups.push(group);
+      }
+      if (group) group.days += 1;
+    }
+    if (group) group.details.append(node);
+  }
+  for (const { week, details, days } of groups) {
+    const open = details.querySelectorAll('li.task:not(.done)').length;
+    details.firstChild.textContent = 'Week of ' +
+      new Date(week).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) +
+      ' · ' + days + (days === 1 ? ' day' : ' days') +
+      (open ? ' · ' + open + (open === 1 ? ' open task' : ' open tasks') : '');
+  }
+}
+preview.addEventListener('toggle', event => {
+  const details = event.target;
+  if (!details.classList?.contains('week-fold')) return;
+  const week = Number(details.dataset.week);
+  if (details.open) openWeeks.add(week); else openWeeks.delete(week);
+}, true);
+// A textarea cannot fold, so compact mode scrolls the source to the first
+// day heading of the current week instead. A hidden copy of the text, laid
+// out like the textarea, measures how far down that heading sits.
+function revealCurrentWeek() {
+  const thisWeek = startOfWeek(new Date()).getTime();
+  let offset = 0;
+  let found = -1;
+  for (const line of content.value.split('\n')) {
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    const date = heading && dayDate(heading[1]);
+    if (date && startOfWeek(date).getTime() >= thisWeek) { found = offset; break; }
+    offset += line.length + 1;
+  }
+  preview.scrollTop = 0;
+  if (found === -1 || !content.clientWidth) return;
+  const style = getComputedStyle(content);
+  const mirror = document.createElement('div');
+  for (const name of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'tabSize', 'paddingLeft', 'paddingRight']) mirror.style[name] = style[name];
+  Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', boxSizing: 'border-box', width: content.clientWidth + 'px', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' });
+  mirror.textContent = content.value.slice(0, found);
+  document.body.append(mirror);
+  content.scrollTop = mirror.offsetHeight;
+  mirror.remove();
 }
 // Offsets of every task line, in the order the preview numbers them.
 function taskLineOffsets(source) {
@@ -414,6 +492,7 @@ function show(note) {
   current = note;
   content.value = note.content;
   renderPreview();
+  if (compactMode.checked) requestAnimationFrame(revealCurrentWeek);
   dirty = false;
   blocked = false;
   blockedMessage = '';
@@ -587,7 +666,7 @@ content.addEventListener('input', event => {
 });
 let syncingScroll = false;
 content.addEventListener('scroll', () => {
-  if (syncingScroll || editor.dataset.view === 'preview') return;
+  if (syncingScroll || compactMode.checked || editor.dataset.view === 'preview') return;
   const from = content.scrollHeight - content.clientHeight;
   const to = preview.scrollHeight - preview.clientHeight;
   if (from <= 0 || to <= 0) return;
@@ -659,6 +738,13 @@ focusMode.addEventListener('change', () => {
   try { localStorage.setItem(FOCUS_KEY, focusMode.checked ? '1' : '0'); } catch {}
 });
 applyFocus();
+const COMPACT_KEY = 'noteCompact';
+try { compactMode.checked = localStorage.getItem(COMPACT_KEY) === '1'; } catch {}
+compactMode.addEventListener('change', () => {
+  renderPreview();
+  if (compactMode.checked) revealCurrentWeek();
+  try { localStorage.setItem(COMPACT_KEY, compactMode.checked ? '1' : '0'); } catch {}
+});
 const SPELL_KEY = 'noteSpellcheck';
 try {
   if (localStorage.getItem(SPELL_KEY) === '0') spellcheck.checked = false;
