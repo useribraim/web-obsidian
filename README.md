@@ -16,7 +16,8 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - Tick **Focus** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
 - Tick **Compact** to fold the day headings (`### 9/11`) of earlier weeks into
-  one line per week. The current week stays open, and the source scrolls to it.
+  one line per week, in the preview and in the source. The source shows only
+  the current week; the earlier weeks stay in the note and save with it.
 - Double-click a title to rename. Deleted notes go to Trash.
 - A version check rejects a save that would overwrite someone else's edit.
 

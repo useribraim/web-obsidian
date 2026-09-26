@@ -186,7 +186,7 @@ function renderMarkdown(source) {
 function renderPreview() {
   if (editor.dataset.view === 'edit') return;
   taskCount = 0;
-  preview.innerHTML = renderMarkdown(content.value);
+  preview.innerHTML = renderMarkdown(noteText());
   if (compactMode.checked) foldEarlierWeeks();
 }
 // Compact mode folds the day headings ("### 9/11") of every earlier week into
@@ -241,29 +241,27 @@ preview.addEventListener('toggle', event => {
   const week = Number(details.dataset.week);
   if (details.open) openWeeks.add(week); else openWeeks.delete(week);
 }, true);
-// A textarea cannot fold, so compact mode scrolls the source to the first
-// day heading of the current week instead. A hidden copy of the text, laid
-// out like the textarea, measures how far down that heading sits.
-function revealCurrentWeek() {
+// A textarea cannot fold, so compact mode keeps the earlier weeks out of it.
+// They wait in foldedSource, and noteText() joins them back for the preview
+// and for every save, so the stored note never loses them.
+let foldedSource = '';
+function noteText() { return foldedSource + content.value; }
+function currentWeekStart(text) {
   const thisWeek = startOfWeek(new Date()).getTime();
   let offset = 0;
-  let found = -1;
-  for (const line of content.value.split('\n')) {
+  for (const line of text.split('\n')) {
     const heading = /^#{1,6}\s+(.*)$/.exec(line);
     const date = heading && dayDate(heading[1]);
-    if (date && startOfWeek(date).getTime() >= thisWeek) { found = offset; break; }
+    if (date && startOfWeek(date).getTime() >= thisWeek) return offset;
     offset += line.length + 1;
   }
-  preview.scrollTop = 0;
-  if (found === -1 || !content.clientWidth) return;
-  const style = getComputedStyle(content);
-  const mirror = document.createElement('div');
-  for (const name of ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'tabSize', 'paddingLeft', 'paddingRight']) mirror.style[name] = style[name];
-  Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', boxSizing: 'border-box', width: content.clientWidth + 'px', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' });
-  mirror.textContent = content.value.slice(0, found);
-  document.body.append(mirror);
-  content.scrollTop = mirror.offsetHeight;
-  mirror.remove();
+  return -1;
+}
+function setNoteText(text) {
+  const split = compactMode.checked ? currentWeekStart(text) : -1;
+  foldedSource = split > 0 ? text.slice(0, split) : '';
+  const shown = text.slice(foldedSource.length);
+  if (content.value !== shown) content.value = shown;
 }
 // Offsets of every task line, in the order the preview numbers them.
 function taskLineOffsets(source) {
@@ -287,11 +285,15 @@ function toggleTaskLine(line) {
 preview.addEventListener('change', event => {
   const box = event.target;
   if (!box.matches('input[data-task]') || content.disabled || mode !== 'active') return;
-  const offset = taskLineOffsets(content.value)[Number(box.dataset.task)];
+  const text = noteText();
+  const offset = taskLineOffsets(text)[Number(box.dataset.task)];
   if (offset === undefined) { renderPreview(); return; }
-  const end = content.value.indexOf('\n', offset);
-  const lineEnd = end === -1 ? content.value.length : end;
-  content.setRangeText(toggleTaskLine(content.value.slice(offset, lineEnd)), offset, lineEnd, 'preserve');
+  const end = text.indexOf('\n', offset);
+  const lineEnd = end === -1 ? text.length : end;
+  const line = toggleTaskLine(text.slice(offset, lineEnd));
+  // A task in a folded week lives outside the textarea.
+  if (offset < foldedSource.length) foldedSource = foldedSource.slice(0, offset) + line + foldedSource.slice(lineEnd);
+  else content.setRangeText(line, offset - foldedSource.length, lineEnd - foldedSource.length, 'preserve');
   content.dispatchEvent(new Event('input', { bubbles: true }));
 });
 // ⌘L: turn the selected lines into tasks, or flip tasks between done and
@@ -479,6 +481,7 @@ function resetDraft() {
   showReport(false);
   clearTimeout(timer);
   current = null;
+  foldedSource = '';
   content.value = '';
   renderPreview();
   dirty = false;
@@ -490,9 +493,8 @@ function resetDraft() {
 function show(note) {
   showReport(false);
   current = note;
-  content.value = note.content;
+  setNoteText(note.content);
   renderPreview();
-  if (compactMode.checked) requestAnimationFrame(revealCurrentWeek);
   dirty = false;
   blocked = false;
   blockedMessage = '';
@@ -516,7 +518,7 @@ async function saveNote() {
   if (mode === 'trash') return false;
   while (savingPromise) { try { await savingPromise; } catch {} }
   if (!dirty) { if (current) message('Saved'); return true; }
-  if (!current && !content.value) {
+  if (!current && !noteText()) {
     dirty = false;
     message('New note');
     return true;
@@ -545,7 +547,7 @@ async function saveNote() {
 async function doSave() {
   message('Saving…');
   const sentTitle = current?.title || 'Untitled note';
-  const sentContent = content.value;
+  const sentContent = noteText();
   const saved = await api(current ? '/' + current.id : '', {
     method: current ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -553,8 +555,8 @@ async function doSave() {
   });
   current = saved;
   notes = [saved, ...notes.filter(item => item.id !== saved.id)];
-  if (content.value === sentContent) {
-    content.value = saved.content;
+  if (noteText() === sentContent) {
+    if (saved.content !== sentContent) setNoteText(saved.content);
     dirty = false;
     message('Saved');
   } else {
@@ -602,7 +604,7 @@ trashButton.onclick = async () => {
 deleteButton.onclick = async () => {
   if (busy || mode === 'trash') return;
   if (!current) {
-    if (content.value && !confirm('Discard this draft?')) return;
+    if (noteText() && !confirm('Discard this draft?')) return;
     resetDraft();
     message('New note');
     content.focus();
@@ -666,7 +668,7 @@ content.addEventListener('input', event => {
 });
 let syncingScroll = false;
 content.addEventListener('scroll', () => {
-  if (syncingScroll || compactMode.checked || editor.dataset.view === 'preview') return;
+  if (syncingScroll || editor.dataset.view === 'preview') return;
   const from = content.scrollHeight - content.clientHeight;
   const to = preview.scrollHeight - preview.clientHeight;
   if (from <= 0 || to <= 0) return;
@@ -741,8 +743,17 @@ applyFocus();
 const COMPACT_KEY = 'noteCompact';
 try { compactMode.checked = localStorage.getItem(COMPACT_KEY) === '1'; } catch {}
 compactMode.addEventListener('change', () => {
+  const folded = foldedSource.length;
+  const start = content.selectionStart + folded;
+  const end = content.selectionEnd + folded;
+  const text = noteText();
+  foldedSource = '';
+  content.value = '';
+  setNoteText(text);
+  const shift = foldedSource.length;
+  content.setSelectionRange(Math.max(0, start - shift), Math.max(0, end - shift));
+  content.scrollTop = 0;
   renderPreview();
-  if (compactMode.checked) revealCurrentWeek();
   try { localStorage.setItem(COMPACT_KEY, compactMode.checked ? '1' : '0'); } catch {}
 });
 const SPELL_KEY = 'noteSpellcheck';
@@ -880,7 +891,7 @@ async function uploadImages(files) {
   finally { setBusy(false); }
   if (links.length) {
     const markdown = '\n\n' + links.join('\n\n') + '\n\n';
-    if (content.value.length - (end - start) + markdown.length > content.maxLength) {
+    if (noteText().length - (end - start) + markdown.length > content.maxLength) {
       message('This note is full. Make room before adding images.', true);
       return;
     }
