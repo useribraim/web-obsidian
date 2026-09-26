@@ -172,3 +172,21 @@ main[data-page="report"] .toolbar, main[data-page="report"] .editor { display: n
   .entry-actions { grid-column: 2; justify-content: flex-end; }
   .entry-form { grid-template-columns: 1fr; }
 }
+
+/* Focus mode: the note, its preview and the timer, nothing else. */
+body.focus { flex-direction: column; }
+body.focus aside { width: 100%; padding: 12px 0; border-right: 0; border-bottom: 1px solid #292929; max-height: none; }
+body.focus aside > header, body.focus nav, body.focus footer, body.focus .timer-summary { display: none; }
+body.focus .timer { flex-direction: row; align-items: center; gap: 12px; width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 32px; border-top: 0; }
+body.focus #task { flex: 1; width: auto; }
+body.focus .timer-row { gap: 12px; }
+body.focus .toolbar { width: 100%; max-width: 1100px; margin: 0 auto; min-height: 0; padding: 10px 32px 0; }
+body.focus .toolbar > :not(.focus-toggle, #status) { display: none; }
+body.focus #status:not(.error) { display: none; }
+body.focus .editor { margin-top: 12px; }
+@media (max-width: 600px) {
+  body.focus aside { padding: 10px 0; }
+  body.focus .timer { flex-wrap: wrap; padding: 0 20px; }
+  body.focus .toolbar { padding: 8px 20px 0; }
+  body.focus #preview { border-top: 1px solid #292929; padding-top: 12px; }
+}

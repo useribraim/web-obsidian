@@ -183,7 +183,7 @@ function renderMarkdown(source) {
   return html;
 }
 function renderPreview() {
-  if (view === 'edit') return;
+  if (editor.dataset.view === 'edit') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(content.value);
 }
@@ -639,6 +639,26 @@ for (const button of viewButtons) {
   };
 }
 applyView();
+// Focus mode keeps the note, its preview and the timer, and hides the rest.
+// The choice survives a reload, so a work day stays in focus until it is unticked.
+const FOCUS_KEY = 'noteFocus';
+const focusMode = document.querySelector('#focus-mode');
+try { focusMode.checked = localStorage.getItem(FOCUS_KEY) === '1'; } catch {}
+function applyFocus() {
+  document.body.classList.toggle('focus', focusMode.checked);
+  if (focusMode.checked) {
+    editor.dataset.view = 'split';
+    renderPreview();
+  } else {
+    applyView();
+  }
+}
+focusMode.addEventListener('change', () => {
+  if (focusMode.checked) showReport(false);
+  applyFocus();
+  try { localStorage.setItem(FOCUS_KEY, focusMode.checked ? '1' : '0'); } catch {}
+});
+applyFocus();
 const SPELL_KEY = 'noteSpellcheck';
 try {
   if (localStorage.getItem(SPELL_KEY) === '0') spellcheck.checked = false;

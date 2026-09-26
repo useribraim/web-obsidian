@@ -13,6 +13,8 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
 - ⌘L turns the current line into a task (`- [ ]`) or flips it between done
   and not done. Click a check box in the preview to flip it there.
+- Tick **Focus** to show only the Markdown, the preview and the timer. The
+  choice stays after a reload, until you untick it.
 - Double-click a title to rename. Deleted notes go to Trash.
 - A version check rejects a save that would overwrite someone else's edit.
 
