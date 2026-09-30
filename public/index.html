@@ -15,11 +15,13 @@
   <link rel="mask-icon" href="/mask-icon.svg" color="#202020">
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
+  <script src="/books.js" defer></script>
 </head>
 <body>
   <aside>
     <header><span class="brand"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="trash" title="Trash">Trash</button><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button></span></header>
     <nav id="notes" aria-label="Notes"></nav>
+    <button id="books-open" class="books-link" title="Open your books">Books</button>
     <section class="timer" aria-label="Time tracker">
       <input id="task" type="text" placeholder="What are you working on?" maxlength="200" autocomplete="off" aria-label="Task description">
       <div class="timer-row"><span id="clock" aria-live="off">0:00:00</span><button id="toggle-timer" class="tool">Start</button></div>
@@ -37,6 +39,28 @@
       </div>
       <div id="week-chart" class="week-chart" role="img" aria-label="Hours per day this week"></div>
       <div id="entries" class="entries"></div>
+    </section>
+    <section id="books-view" class="books" aria-label="Books">
+      <div id="library" class="library">
+        <div class="books-head"><h2>Books</h2><span id="books-note" role="status"></span><button id="books-upload" class="tool">Upload book</button><button id="books-close" class="tool">Back to notes</button></div>
+        <div id="books-list" class="books-list"></div>
+      </div>
+      <div id="reader" class="reader" hidden>
+        <div class="reader-bar">
+          <button id="reader-back" class="tool">‹ Library</button>
+          <span id="reader-title" class="reader-title"></span>
+          <select id="reader-toc" class="tool epub-only" aria-label="Contents"></select>
+          <button id="reader-smaller" class="tool epub-only" title="Smaller text" aria-label="Smaller text">A−</button>
+          <button id="reader-larger" class="tool epub-only" title="Larger text" aria-label="Larger text">A+</button>
+          <button id="reader-theme" class="tool epub-only" title="Switch between dark and light">Light</button>
+          <label class="tool pdf-only" title="The browser's PDF viewer cannot report its page. Type the page where you stopped.">Page <input id="reader-page" type="number" min="1" step="1" aria-label="Page number"></label>
+          <button id="reader-prev" class="tool epub-only" aria-label="Previous page">‹</button>
+          <span id="reader-progress" class="reader-progress epub-only"></span>
+          <button id="reader-next" class="tool epub-only" aria-label="Next page">›</button>
+        </div>
+        <div id="reader-stage" class="reader-stage"></div>
+      </div>
+      <input id="book-file" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
     </section>
     <div class="toolbar"><span id="status" role="status">Loading…</span><label class="tool checkbox focus-toggle" title="Show only the note, its preview, and the timer"><input type="checkbox" id="focus-mode"> Focus</label><label class="tool checkbox compact-toggle" title="Fold the day headings of earlier weeks, and keep the current week open"><input type="checkbox" id="compact-mode"> Compact</label><span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span><button id="bold" class="tool" title="Bold (⌘B)" aria-label="Bold">B</button><button id="italic" class="tool" title="Italic (⌘I)" aria-label="Italic">I</button><label class="tool checkbox" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label><button id="delete" class="tool">Delete</button><button id="restore" class="tool" hidden>Restore</button><button id="purge" class="tool" hidden>Delete forever</button><button id="save" class="tool">Save <kbd>⌘S</kbd></button></div>
     <section class="editor" id="editor" data-view="split">

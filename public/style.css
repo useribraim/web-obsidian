@@ -197,3 +197,42 @@ body.focus .editor { margin-top: 12px; }
 #preview .week-fold > summary { cursor: pointer; padding: 6px 10px; color: #999; font-size: .85em; background: #191919; border: 1px solid #292929; border-radius: 6px; }
 #preview .week-fold > summary:hover { color: #c9bcdf; border-color: #4a4159; }
 #preview .week-fold[open] > summary { margin-bottom: .75em; }
+
+/* Books: the library, and the reader. */
+.books-link { display: block; width: 100%; margin: 4px 0 10px; padding: 10px 12px; text-align: left; font-size: 13px; color: #999; }
+.books-link::before { content: '▤'; margin-right: 10px; color: #666; }
+main[data-page="books"] .toolbar, main[data-page="books"] .editor { display: none; }
+.books { display: none; flex: 1; min-height: 0; flex-direction: column; }
+main[data-page="books"] .books { display: flex; }
+.library { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px 48px; flex: 1; min-height: 0; overflow: auto; }
+.books-head { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; }
+.books-head h2 { margin: 0 auto 0 0; font-size: 20px; font-weight: 600; }
+#books-note { font-size: 12px; color: #777; }
+#books-note.error { color: #e7a39c; }
+.books-list { display: flex; flex-direction: column; }
+.book { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #222; }
+.book-open { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 12px 8px; text-align: left; }
+.book-title { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-meta { font-size: 12px; color: #777; }
+.book-action { flex-shrink: 0; font-size: 12px; color: #999; padding: 6px 9px; }
+.book-action.danger:hover { color: #e7a39c; background: #3b2828; }
+.books.book-drop { outline: 2px dashed #a899ce; outline-offset: -6px; background: #a899ce0a; }
+.reader { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.reader[hidden] { display: none; }
+.reader-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 14px 28px; }
+.reader-title { flex: 1; min-width: 80px; font-size: 13px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader-progress { min-width: 40px; text-align: center; font-size: 12px; color: #999; font-variant-numeric: tabular-nums; }
+.reader[data-format="pdf"] .epub-only, .reader[data-format="epub"] .pdf-only { display: none; }
+#reader-toc { max-width: 200px; }
+#reader-page { width: 64px; padding: 2px 4px; font-size: 12px; background: #191919; border: 1px solid #333; border-radius: 4px; color-scheme: dark; }
+.reader-stage { position: relative; flex: 1; min-height: 0; width: 100%; padding: 0 28px 20px; }
+.reader-stage iframe { width: 100%; height: 100%; border: 1px solid #292929; border-radius: 6px; background: #fff; }
+.reader[data-format="epub"] .reader-stage { max-width: 820px; margin: 0 auto; }
+.reader-stage[data-theme="light"] { color: #222; }
+@media (max-width: 600px) {
+  .library { padding: 16px 20px 32px; }
+  .books-head { flex-wrap: wrap; }
+  .reader-bar { padding: 10px 20px; }
+  .reader-stage { padding: 0 20px 12px; }
+}
+body.focus .books-link { display: none; }
