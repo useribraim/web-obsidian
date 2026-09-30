@@ -324,7 +324,9 @@ function bookFormat(bytes) {
   if (text.startsWith('PK\x03\x04') && text.slice(30, 100).includes('mimetypeapplication/epub+zip')) return 'epub';
   return null;
 }
-const bookTitle = (name) => (typeof name === 'string' ? name : '').replace(/\.(pdf|epub)$/i, '').trim().slice(0, 200) || 'Untitled book';
+// Library downloads often name a file "Title -- Author -- Publisher -- ISBN -- hash".
+// Keep the text before the first " -- ", which is the title.
+const bookTitle = (name) => (typeof name === 'string' ? name : '').replace(/\.(pdf|epub)$/i, '').split(' -- ')[0].trim().slice(0, 200) || 'Untitled book';
 
 async function parseBookJson(request, limit) {
   const text = await request.text();
