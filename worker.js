@@ -387,6 +387,17 @@ async function bookResponse(request, env, url) {
       await env.BOOKS.delete(key);
       return json({ error: format ? 'This file is too large. The limit is 95 MB.' : 'Use a PDF or an EPUB file.' }, format ? 413 : 415);
     }
+    // R2 computes an MD5 checksum on upload. The same size and the same checksum
+    // mean the same file, so the copy is dropped and the book already stored is named.
+    const { results: sameSize } = await env.DB.prepare('SELECT id FROM books WHERE size = ?').bind(stored.size).all();
+    for (const other of sameSize) {
+      const existing = await env.BOOKS.head('books/' + other.id);
+      if (existing && existing.etag === stored.etag) {
+        await env.BOOKS.delete(key);
+        const book = await env.DB.prepare(bookQuery).bind(other.id).first();
+        return json({ error: `"${book.title}" is already in your library.`, existing: book }, 409);
+      }
+    }
     try {
       await env.DB.prepare('INSERT INTO books (id, title, format, size) VALUES (?, ?, ?, ?)')
         .bind(id, bookTitle(url.searchParams.get('name')), format, stored.size).run();

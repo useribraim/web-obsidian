@@ -35,22 +35,37 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 
 ## Books
 
-- Click **Books** in the sidebar. Upload PDF and EPUB files with **Upload book**
-  or by dropping them on the page. The limit is 95 MB for each file.
+- Click **Books** at the top of the sidebar. Upload PDF and EPUB files with
+  **Upload book** or by dropping them on the page. The limit is 95 MB for each
+  file. A file already in the library is refused, and the message names the
+  copy that is stored.
+- The upload keeps only the title from a file name like
+  `Title -- Author -- Publisher -- ISBN -- hash`.
 - The files live in an R2 bucket and stream to the reader. D1 holds only the
   title, size, and reading position.
-- A **PDF** opens in the browser's own viewer. That viewer cannot report which
-  page you are on, so type the page where you stopped in the **Page** box. The
-  box saves it, and the book opens there next time.
-- An **EPUB** opens in the reader, in dark or light. Use the contents menu,
-  the arrow keys or the ‹ › buttons to move, and A− A+ to size the text. The
-  reader saves the position on its own and shows the progress as a percentage.
-- Escape leaves the reader, then the library. **Rename** and **Delete** are on
-  each row; Delete removes the file from R2 and cannot be undone.
-- The reader uses two libraries, copied into `public/vendor/` as plain files and
-  loaded only when an EPUB opens: `epub.min.js` (epub.js 0.3.93, BSD-2-Clause)
-  and `jszip.min.js` (JSZip 3.10.1, MIT). Both come from the npm packages
-  `epubjs` and `jszip`.
+- Each book has an address: `#/books` is the library and `#/books/<id>` is a
+  book. Reload, the back button and a saved link all return to the same place.
+- **Rename** edits the title in place. **Delete** asks twice: the first click
+  arms the button, and the second click removes the file from R2. It cannot be
+  undone.
+- A **PDF** is drawn by pdf.js in a scroll box. Only the pages near the screen
+  are drawn. The reader saves the page and the place on it as you scroll, and
+  opens the book there next time. The contents menu comes from the PDF's own
+  outline. The words can be selected, and Ctrl+F finds them on the pages that
+  are drawn. Type a page number in the **Page** box to jump to it.
+- An **EPUB** is drawn by epub.js. Use the contents menu, the arrow keys or the
+  ‹ › buttons to move. The reader saves the position and shows the progress.
+- **A−** and **A+** change the text size of an EPUB and the zoom of a PDF.
+  **Dark** and **Light** switch the EPUB theme, or invert the pages of a PDF.
+- **Hide sidebar** removes the sidebar while you read and **Show sidebar**
+  brings it back. The choice is remembered. On a narrow screen the sidebar
+  starts hidden. Leaving the reader always shows the sidebar again.
+- Escape leaves the reader, then the library.
+- The readers load only when a book opens, from `public/vendor/`, as plain
+  files: `pdf.min.mjs` and `pdf.worker.min.mjs` (pdf.js 6.3.289, Apache-2.0),
+  `epub.min.js` (epub.js 0.3.93, BSD-2-Clause) and `jszip.min.js` (JSZip 3.10.1,
+  MIT). All four come from the npm packages `pdfjs-dist`, `epubjs` and `jszip`.
+  `public/pdf-view.js` is the PDF reader built on pdf.js.
 - Existing databases need `migrations/0005_add_books.sql`. The Worker also needs
   the R2 bucket described under Deploy.
 

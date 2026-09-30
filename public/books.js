@@ -1,32 +1,39 @@
 // Books: a library of PDF and EPUB files, and a reader for each. The files live
-// in R2; the server keeps the title and the reading position. A PDF opens in
-// the browser's own viewer. An EPUB is drawn by epub.js, loaded on first use.
+// in R2; the server keeps the title and the reading position. A PDF is drawn by
+// pdf.js (see pdf-view.js). An EPUB is drawn by epub.js. Both load on first use.
+// The address decides what is on screen: #/books is the library and
+// #/books/<id> is a book, so reload and the back button work.
 (() => {
   const view = document.querySelector('#books-view');
-  const openButton = document.querySelector('#books-open');
-  const closeButton = document.querySelector('#books-close');
-  const uploadButton = document.querySelector('#books-upload');
-  const fileInput = document.querySelector('#book-file');
   const shelf = document.querySelector('#books-list');
   const note = document.querySelector('#books-note');
   const library = document.querySelector('#library');
   const reader = document.querySelector('#reader');
   const stage = document.querySelector('#reader-stage');
+  const readerBar = document.querySelector('.reader-bar');
   const readerTitle = document.querySelector('#reader-title');
   const toc = document.querySelector('#reader-toc');
   const smaller = document.querySelector('#reader-smaller');
   const larger = document.querySelector('#reader-larger');
   const themeButton = document.querySelector('#reader-theme');
   const pageInput = document.querySelector('#reader-page');
+  const pageTotal = document.querySelector('#reader-pages');
   const prevButton = document.querySelector('#reader-prev');
   const nextButton = document.querySelector('#reader-next');
   const progressLabel = document.querySelector('#reader-progress');
-  const backButton = document.querySelector('#reader-back');
+  const sidebarButton = document.querySelector('#reader-sidebar');
+  const uploadButton = document.querySelector('#books-upload');
+  const closeButton = document.querySelector('#books-close');
+  const fileInput = document.querySelector('#book-file');
 
   const MAX_BOOK_BYTES = 95_000_000;
+  const SAVE_DELAY = 1500;
+  const ROUTE = /^#\/books(?:\/([a-f0-9-]{36}))?$/;
   const THEME_KEY = 'bookTheme';
   const FONT_KEY = 'bookFont';
-  const SAVE_DELAY = 1500;
+  const NIGHT_KEY = 'bookPdfNight';
+  const ZOOM_KEY = 'bookZoom';
+  const SIDEBAR_KEY = 'bookSidebar';
   const THEMES = {
     dark: { html: { background: '#1e1e1e !important' }, body: { background: '#1e1e1e !important', color: '#d4d4d4 !important', 'line-height': '1.6 !important' }, 'p, div, span, li, blockquote, h1, h2, h3, h4, h5, h6': { color: '#d4d4d4 !important' }, a: { color: '#b9a7e0 !important' } },
     light: { html: { background: '#f6f3ec !important' }, body: { background: '#f6f3ec !important', color: '#222 !important', 'line-height': '1.6 !important' }, 'p, div, span, li, blockquote, h1, h2, h3, h4, h5, h6': { color: '#222 !important' }, a: { color: '#5a3fa0 !important' } },
@@ -34,6 +41,7 @@
 
   let books = [];
   let current = null;
+  let pdf = null;
   let epub = null;
   let rendition = null;
   let openToken = 0;
@@ -43,6 +51,10 @@
   const remember = (key, value) => { try { localStorage.setItem(key, value); } catch {} };
   let theme = stored(THEME_KEY, 'dark') === 'light' ? 'light' : 'dark';
   let fontPercent = Math.min(200, Math.max(70, Number(stored(FONT_KEY, '110')) || 110));
+  let night = stored(NIGHT_KEY, '0') === '1';
+  let zoom = Math.min(3, Math.max(0.5, Number(stored(ZOOM_KEY, '1')) || 1));
+  // On a narrow screen the sidebar is hidden while you read, unless you chose otherwise.
+  let sidebarHidden = stored(SIDEBAR_KEY, window.matchMedia('(max-width: 600px)').matches ? 'hidden' : 'shown') === 'hidden';
 
   function say(text, error = false) {
     note.textContent = text;
@@ -58,12 +70,18 @@
   function formatSize(bytes) {
     return bytes >= 1e6 ? (bytes / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1e3)) + ' KB';
   }
+  // A PDF position is "page:12" or "page:12:0.40", the second number being how
+  // far down the page the top edge of the screen was.
+  function parsePdfPosition(position) {
+    const match = /^page:(\d+)(?::([\d.]+))?$/.exec(position || '');
+    return match ? { page: Number(match[1]), offset: Math.min(1, Number(match[2]) || 0) } : null;
+  }
   function describeProgress(book) {
-    if (book.format === 'pdf') {
-      const page = Number((book.position || '').replace('page:', ''));
-      return page ? 'page ' + page : 'not started';
-    }
-    return book.position ? Math.round(book.progress * 100) + '%' : 'not started';
+    if (!book.position) return 'not started';
+    const percent = Math.round(book.progress * 100) + '%';
+    if (book.format === 'epub') return percent;
+    const at = parsePdfPosition(book.position);
+    return at ? `page ${at.page} · ${percent}` : 'not started';
   }
 
   function renderShelf() {
@@ -78,8 +96,9 @@
     for (const book of books) {
       const row = document.createElement('div');
       row.className = 'book';
-      const open = document.createElement('button');
+      const open = document.createElement('a');
       open.className = 'book-open';
+      open.href = '#/books/' + book.id;
       const title = document.createElement('span');
       title.className = 'book-title';
       title.textContent = book.title;
@@ -87,15 +106,14 @@
       meta.className = 'book-meta';
       meta.textContent = `${book.format.toUpperCase()} · ${formatSize(book.size)} · ${describeProgress(book)}`;
       open.append(title, meta);
-      open.onclick = () => openBook(book);
       const rename = document.createElement('button');
       rename.className = 'book-action';
       rename.textContent = 'Rename';
-      rename.onclick = () => renameBook(book);
+      rename.onclick = () => startRename(book, open);
       const remove = document.createElement('button');
       remove.className = 'book-action danger';
       remove.textContent = 'Delete';
-      remove.onclick = () => deleteBook(book);
+      remove.onclick = () => askDelete(book, remove);
       row.append(open, rename, remove);
       shelf.append(row);
     }
@@ -106,22 +124,57 @@
       renderShelf();
     } catch (error) { say(error.message, true); }
   }
-  async function renameBook(book) {
-    const title = prompt('Book title', book.title);
-    if (title === null || title.trim() === book.title) return;
-    try {
-      Object.assign(book, await booksApi('/' + book.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) }));
+
+  // Rename in place: Enter or leaving the box saves, Escape cancels.
+  function startRename(book, open) {
+    const input = document.createElement('input');
+    input.className = 'book-rename';
+    input.value = book.title;
+    input.maxLength = 200;
+    input.setAttribute('aria-label', 'Book title');
+    open.replaceWith(input);
+    input.focus();
+    input.select();
+    let finished = false;
+    const finish = async save => {
+      if (finished) return;
+      finished = true;
+      const title = input.value.trim();
+      if (save && title && title !== book.title) {
+        try {
+          Object.assign(book, await booksApi('/' + book.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) }));
+        } catch (error) { say(error.message, true); }
+      }
       renderShelf();
-    } catch (error) { say(error.message, true); }
+    };
+    input.onkeydown = event => {
+      if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+      else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(false); }
+    };
+    input.onblur = () => finish(true);
+  }
+  // Delete asks twice: the first click arms the button, the second one deletes.
+  function askDelete(book, button) {
+    if (button.dataset.armed) { deleteBook(book); return; }
+    button.dataset.armed = '1';
+    button.textContent = 'Delete forever?';
+    button.classList.add('armed');
+    const disarm = () => {
+      clearTimeout(timer);
+      delete button.dataset.armed;
+      button.textContent = 'Delete';
+      button.classList.remove('armed');
+    };
+    const timer = setTimeout(disarm, 4000);
+    button.onblur = disarm;
   }
   async function deleteBook(book) {
-    if (!confirm(`Delete "${book.title}" and its file? This cannot be undone.`)) return;
     try {
       await booksApi('/' + book.id, { method: 'DELETE' });
       books = books.filter(item => item.id !== book.id);
       renderShelf();
       say('Deleted');
-    } catch (error) { say(error.message, true); }
+    } catch (error) { say(error.message, true); renderShelf(); }
   }
 
   function upload(file) {
@@ -208,28 +261,52 @@
     return libraries;
   }
 
-  function openPdf(book, page) {
-    const number = page || Number((book.position || '').replace('page:', '')) || 1;
-    const frame = document.createElement('iframe');
-    frame.title = book.title;
-    frame.src = `/api/books/${book.id}/file#page=${number}`;
-    stage.replaceChildren(frame);
-    pageInput.value = number;
+  // PDF
+  function onPdfPage(page, offset, count) {
+    if (!current || current.format !== 'pdf') return;
+    if (document.activeElement !== pageInput) pageInput.value = page;
+    const progress = Math.min(1, (page - 1 + offset) / count);
+    progressLabel.textContent = Math.round(progress * 100) + '%';
+    const saved = parsePdfPosition(current.position);
+    // Opening a book at its start, or at the place already saved, saves nothing.
+    if (!saved && page === 1 && offset < 0.005) return;
+    if (saved && saved.page === page && Math.abs(saved.offset - offset) < 0.02) return;
+    savePosition(`page:${page}:${offset.toFixed(2)}`, progress);
+  }
+  async function openPdf(book, token) {
+    const opened = new window.PdfView(stage, { onPage: onPdfPage });
+    pdf = opened;
+    opened.setNight(night);
+    const saved = parsePdfPosition(book.position);
+    await opened.open(`/api/books/${book.id}/file`, { page: saved?.page, offset: saved?.offset, zoom });
+    if (token !== openToken) return;
+    pageInput.max = opened.pageCount;
+    pageInput.value = saved?.page || 1;
+    pageTotal.textContent = ' / ' + opened.pageCount;
+    progressLabel.textContent = book.position ? Math.round(book.progress * 100) + '%' : '';
+    opened.focus();
+    opened.outline().then(items => {
+      if (pdf !== opened) return;
+      toc.replaceChildren(new Option('Contents', ''));
+      items.forEach((item, index) => toc.append(new Option('  '.repeat(item.depth) + item.title, String(index))));
+      toc.hidden = !items.length;
+      toc.pdfItems = items;
+    }).catch(() => {});
   }
   pageInput.onchange = () => {
-    const number = Math.max(1, Math.floor(Number(pageInput.value)) || 1);
+    if (!pdf) return;
+    const number = Math.min(pdf.pageCount, Math.max(1, Math.floor(Number(pageInput.value)) || 1));
     pageInput.value = number;
-    if (current?.format !== 'pdf') return;
-    openPdf(current, number);
-    savePosition('page:' + number, 0);
+    pdf.goTo(number);
+    pdf.focus();
   };
 
+  // EPUB
   function applyEpubStyle() {
     if (!rendition) return;
     rendition.themes.select(theme);
     rendition.themes.fontSize(fontPercent + '%');
     stage.dataset.theme = theme;
-    themeButton.textContent = theme === 'dark' ? 'Light' : 'Dark';
   }
   function onRelocated(location) {
     if (!location?.start || !epub || !current) return;
@@ -252,7 +329,11 @@
     for (const [name, rules] of Object.entries(THEMES)) rendition.themes.register(name, rules);
     applyEpubStyle();
     rendition.on('relocated', onRelocated);
-    rendition.on('keyup', keyboardTurn);
+    // Keys pressed inside the book's own frame do not reach the page, so this is the only place to hear them.
+    rendition.on('keyup', event => {
+      if (event.key === 'Escape') location.hash = '#/books';
+      else keyboardTurn(event);
+    });
     await rendition.display(book.position || undefined);
     if (token !== openToken) return;
     const opened = epub;
@@ -264,18 +345,13 @@
         if (item.subitems?.length) add(item.subitems, depth + 1);
       });
       add(navigation.toc, 0);
+      toc.hidden = false;
     });
     // Locations turn a position into a percentage. They take a moment to compute.
     opened.ready.then(() => opened.locations.generate(1600)).then(() => {
       if (epub === opened) onRelocated(rendition.currentLocation());
     }).catch(() => {});
   }
-  toc.onchange = () => { if (rendition && toc.value) rendition.display(toc.value); toc.value = ''; };
-  smaller.onclick = () => { fontPercent = Math.max(70, fontPercent - 10); remember(FONT_KEY, fontPercent); applyEpubStyle(); };
-  larger.onclick = () => { fontPercent = Math.min(200, fontPercent + 10); remember(FONT_KEY, fontPercent); applyEpubStyle(); };
-  themeButton.onclick = () => { theme = theme === 'dark' ? 'light' : 'dark'; remember(THEME_KEY, theme); applyEpubStyle(); };
-  prevButton.onclick = () => rendition?.prev();
-  nextButton.onclick = () => rendition?.next();
   function keyboardTurn(event) {
     if (event.key === 'ArrowRight' || event.key === 'PageDown') rendition?.next();
     else if (event.key === 'ArrowLeft' || event.key === 'PageUp') rendition?.prev();
@@ -286,22 +362,65 @@
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); keyboardTurn(event); }
   });
 
+  // Controls that work for both formats
+  toc.onchange = () => {
+    const value = toc.value;
+    toc.value = '';
+    if (!value) return;
+    if (pdf) pdf.goToDestination(toc.pdfItems[Number(value)].dest).then(() => pdf?.focus());
+    else if (rendition) rendition.display(value);
+  };
+  function updateThemeButton() {
+    const dark = pdf ? night : theme === 'dark';
+    themeButton.textContent = dark ? 'Light' : 'Dark';
+  }
+  smaller.onclick = () => {
+    if (pdf) { zoom = Math.max(0.5, +(zoom - 0.1).toFixed(2)); remember(ZOOM_KEY, zoom); pdf.setZoom(zoom); }
+    else { fontPercent = Math.max(70, fontPercent - 10); remember(FONT_KEY, fontPercent); applyEpubStyle(); }
+  };
+  larger.onclick = () => {
+    if (pdf) { zoom = Math.min(3, +(zoom + 0.1).toFixed(2)); remember(ZOOM_KEY, zoom); pdf.setZoom(zoom); }
+    else { fontPercent = Math.min(200, fontPercent + 10); remember(FONT_KEY, fontPercent); applyEpubStyle(); }
+  };
+  themeButton.onclick = () => {
+    if (pdf) { night = !night; remember(NIGHT_KEY, night ? '1' : '0'); pdf.setNight(night); }
+    else { theme = theme === 'dark' ? 'light' : 'dark'; remember(THEME_KEY, theme); applyEpubStyle(); }
+    updateThemeButton();
+  };
+  prevButton.onclick = () => { if (pdf) pdf.goTo(pdf.position().page - 1); else rendition?.prev(); };
+  nextButton.onclick = () => { if (pdf) pdf.goTo(pdf.position().page + 1); else rendition?.next(); };
+  // After a click on a button, the keys should scroll the book again.
+  readerBar.addEventListener('click', event => { if (pdf && event.target.closest('button')) pdf.focus(); });
+
+  function applySidebar() {
+    document.body.classList.toggle('reading-full', sidebarHidden && !reader.hidden);
+    sidebarButton.textContent = sidebarHidden ? 'Show sidebar' : 'Hide sidebar';
+  }
+  sidebarButton.onclick = () => {
+    sidebarHidden = !sidebarHidden;
+    remember(SIDEBAR_KEY, sidebarHidden ? 'hidden' : 'shown');
+    applySidebar();
+  };
+
   async function openBook(book) {
     closeReader();
     const token = ++openToken;
     current = book;
     readerTitle.textContent = book.title;
     reader.dataset.format = book.format;
+    document.title = book.title + ' — Notes';
     library.hidden = true;
     reader.hidden = false;
+    toc.replaceChildren();
+    toc.hidden = true;
+    progressLabel.textContent = book.position ? Math.round(book.progress * 100) + '%' : '';
+    themeButton.textContent = (book.format === 'pdf' ? night : theme === 'dark') ? 'Light' : 'Dark';
+    applySidebar();
     say('');
+    stage.textContent = 'Loading…';
     try {
-      if (book.format === 'pdf') openPdf(book);
-      else {
-        stage.textContent = 'Loading…';
-        progressLabel.textContent = book.position ? Math.round(book.progress * 100) + '%' : '';
-        await openEpub(book, token);
-      }
+      if (book.format === 'pdf') await openPdf(book, token);
+      else await openEpub(book, token);
     } catch (error) {
       // A newer open or a close has already replaced this one; leave it alone.
       if (token !== openToken) return;
@@ -312,33 +431,62 @@
   function closeReader() {
     openToken += 1;
     flushPosition();
+    pdf?.destroy();
     rendition?.destroy();
     epub?.destroy();
+    pdf = null;
     rendition = null;
     epub = null;
     current = null;
     stage.replaceChildren();
+    stage.removeAttribute('data-theme');
     toc.replaceChildren();
     reader.hidden = true;
     library.hidden = false;
+    document.title = 'Notes';
+    applySidebar();
     renderShelf();
   }
-  backButton.onclick = closeReader;
 
-  function showBooks() {
+  // The address is the single source of truth. A link, the back button, a reload
+  // and a shared address all end up here.
+  function enterBooks() {
+    if (main.dataset.page === 'books') return false;
     showReport(false);
     main.dataset.page = 'books';
-    loadBooks();
+    return true;
   }
-  // showReport in app.js calls this whenever the page changes, so it also runs
-  // when the notes or the report open. It must do nothing if no reader is open.
-  window.closeBooks = () => { if (current) closeReader(); };
-  openButton.onclick = showBooks;
+  async function route() {
+    const match = ROUTE.exec(location.hash);
+    if (!match) { if (main.dataset.page === 'books') showReport(false); return; }
+    const fresh = enterBooks();
+    if (!match[1]) {
+      if (current) closeReader();
+      if (fresh || !books.length) await loadBooks();
+      return;
+    }
+    if (current?.id === match[1]) return;
+    if (!books.length) await loadBooks();
+    let book = books.find(item => item.id === match[1]);
+    // A book added in another tab or on another device is not in the list yet.
+    if (!book) { await loadBooks(); book = books.find(item => item.id === match[1]); }
+    if (!book) { say('That book is not in your library.', true); history.replaceState(null, '', '#/books'); renderShelf(); return; }
+    await openBook(book);
+  }
+  window.routeBooks = route;
+  window.addEventListener('hashchange', route);
+  // showReport in app.js calls this whenever the page changes to the notes or the
+  // report. Leaving by a click on a note must also clear the address.
+  window.closeBooks = () => {
+    if (main.dataset.page !== 'books') return;
+    if (current) closeReader();
+    if (location.hash.startsWith('#/books')) history.pushState(null, '', location.pathname + location.search);
+  };
   closeButton.onclick = () => showReport(false);
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || main.dataset.page !== 'books' || event.isComposing) return;
     event.preventDefault();
-    if (current) closeReader();
+    if (current) location.hash = '#/books';
     else showReport(false);
   });
 })();

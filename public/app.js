@@ -841,7 +841,8 @@ async function init() {
     else { message('New note'); content.focus(); }
   } catch (error) { setBusy(false); message(error.message, true); }
 }
-init();
+// Books read the address after the first note has loaded, so that a link to a book is not undone.
+init().then(() => window.routeBooks?.());
 
 // Images live separately from note text. Insert links only after upload succeeds.
 const MAX_IMAGE_BYTES = 1_500_000;
