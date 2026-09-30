@@ -1291,6 +1291,7 @@ function renderReport() {
   }
 }
 function showReport(open) {
+  window.closeBooks?.();
   main.dataset.page = open ? 'report' : 'notes';
   reportView.hidden = !open;
   if (open) renderReport();

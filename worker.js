@@ -309,6 +309,130 @@ async function imageResponse(request, env, url) {
   return null;
 }
 
+// Books. The file lives in R2 and is streamed in and out, so a large book
+// never sits in memory or in a D1 row. D1 keeps the title, the size, and the
+// reading position. A Worker on the free plan accepts a request body of up to
+// 100 MB, so the limit stays a little below that.
+const BOOK_LIMIT = 95_000_000;
+const BOOK_TYPES = { pdf: 'application/pdf', epub: 'application/epub+zip' };
+const bookQuery = 'SELECT id, title, format, size, position, progress, created_at, read_at FROM books WHERE id = ?';
+// Judge the format from the first bytes, not from the file name. An EPUB is a
+// ZIP whose first entry is a file named "mimetype" that holds its own type.
+function bookFormat(bytes) {
+  const text = new TextDecoder('latin1').decode(bytes);
+  if (text.includes('%PDF-')) return 'pdf';
+  if (text.startsWith('PK\x03\x04') && text.slice(30, 100).includes('mimetypeapplication/epub+zip')) return 'epub';
+  return null;
+}
+// Library downloads often name a file "Title -- Author -- Publisher -- ISBN -- hash".
+// Keep the text before the first " -- ", which is the title.
+const bookTitle = (name) => (typeof name === 'string' ? name : '').replace(/\.(pdf|epub)$/i, '').split(' -- ')[0].trim().slice(0, 200) || 'Untitled book';
+
+async function parseBookJson(request, limit) {
+  const text = await request.text();
+  if (text.length > limit) return null;
+  try { return JSON.parse(text); } catch { return null; }
+}
+
+async function bookFileResponse(request, env, book) {
+  const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('Range') || '');
+  let start = 0;
+  let end = book.size - 1;
+  if (range && (range[1] || range[2])) {
+    if (range[1]) {
+      start = Number(range[1]);
+      if (range[2]) end = Math.min(end, Number(range[2]));
+    } else {
+      start = Math.max(0, book.size - Number(range[2]));
+    }
+    if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${book.size}` } });
+  }
+  const partial = Boolean(range) && (start !== 0 || end !== book.size - 1);
+  const object = await env.BOOKS.get('books/' + book.id, partial ? { range: { offset: start, length: end - start + 1 } } : undefined);
+  if (!object) return json({ error: 'The book file is missing.' }, 404);
+  const headers = {
+    'Content-Type': BOOK_TYPES[book.format],
+    'Content-Length': String(end - start + 1),
+    'Accept-Ranges': 'bytes',
+    'Cache-Control': 'private, max-age=86400',
+    'ETag': object.httpEtag,
+    'X-Content-Type-Options': 'nosniff',
+  };
+  if (partial) headers['Content-Range'] = `bytes ${start}-${end}/${book.size}`;
+  return new Response(request.method === 'HEAD' ? null : object.body, { status: partial ? 206 : 200, headers });
+}
+
+async function bookResponse(request, env, url) {
+  if (!url.pathname.startsWith('/api/books')) return null;
+  if (request.method !== 'GET' && request.method !== 'HEAD' && !sameOrigin(request, url)) return json({ error: 'Invalid origin.' }, 403);
+
+  if (url.pathname === '/api/books' && request.method === 'GET') {
+    const { results } = await env.DB.prepare(
+      'SELECT id, title, format, size, position, progress, created_at, read_at FROM books ORDER BY COALESCE(read_at, created_at) DESC'
+    ).all();
+    return json(results);
+  }
+
+  if (url.pathname === '/api/books' && request.method === 'POST') {
+    const length = Number(request.headers.get('Content-Length'));
+    if (!Number.isInteger(length) || length <= 0) return json({ error: 'Choose a file to upload.' }, 411);
+    if (length > BOOK_LIMIT) return json({ error: 'This file is too large. The limit is 95 MB.' }, 413);
+    if (!request.body) return json({ error: 'Choose a file to upload.' }, 400);
+    const id = crypto.randomUUID();
+    const key = 'books/' + id;
+    const stored = await env.BOOKS.put(key, request.body);
+    const head = await env.BOOKS.get(key, { range: { offset: 0, length: 1024 } });
+    const format = head ? bookFormat(new Uint8Array(await head.arrayBuffer())) : null;
+    if (!format || stored.size > BOOK_LIMIT) {
+      await env.BOOKS.delete(key);
+      return json({ error: format ? 'This file is too large. The limit is 95 MB.' : 'Use a PDF or an EPUB file.' }, format ? 413 : 415);
+    }
+    try {
+      await env.DB.prepare('INSERT INTO books (id, title, format, size) VALUES (?, ?, ?, ?)')
+        .bind(id, bookTitle(url.searchParams.get('name')), format, stored.size).run();
+    } catch (error) {
+      await env.BOOKS.delete(key);
+      throw error;
+    }
+    return json(await env.DB.prepare(bookQuery).bind(id).first(), 201);
+  }
+
+  const match = /^\/api\/books\/([a-f0-9-]{36})(\/file|\/position)?$/.exec(url.pathname);
+  if (!match) return json({ error: 'Not found.' }, 404);
+  const [, id, action] = match;
+  const book = await env.DB.prepare(bookQuery).bind(id).first();
+  if (!book) return json({ error: 'Book not found.' }, 404);
+
+  if (action === '/file' && (request.method === 'GET' || request.method === 'HEAD')) return bookFileResponse(request, env, book);
+
+  if (action === '/position' && request.method === 'PUT') {
+    const data = await parseBookJson(request, 2048);
+    if (!data || typeof data.position !== 'string' || data.position.length > 1000 || typeof data.progress !== 'number' || !Number.isFinite(data.progress)) {
+      return json({ error: 'Invalid reading position.' }, 400);
+    }
+    const progress = Math.min(1, Math.max(0, data.progress));
+    await env.DB.prepare("UPDATE books SET position = ?, progress = ?, read_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?")
+      .bind(data.position, progress, id).run();
+    return json(await env.DB.prepare(bookQuery).bind(id).first());
+  }
+
+  if (!action && request.method === 'PUT') {
+    const data = await parseBookJson(request, 2048);
+    if (!data || typeof data.title !== 'string' || data.title.length > 200) return json({ error: 'Use a title under 200 characters.' }, 400);
+    await env.DB.prepare('UPDATE books SET title = ? WHERE id = ?').bind(data.title.trim() || 'Untitled book', id).run();
+    return json(await env.DB.prepare(bookQuery).bind(id).first());
+  }
+
+  if (!action && request.method === 'DELETE') {
+    // Delete the file first. If that fails, the row stays and the request can be repeated.
+    await env.BOOKS.delete('books/' + id);
+    await env.DB.prepare('DELETE FROM books WHERE id = ?').bind(id).run();
+    return json({ ok: true });
+  }
+
+  return json({ error: 'Not found.' }, 404);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -326,6 +450,8 @@ export default {
       if (image) return image;
       const time = await timeResponse(request, env, url);
       if (time) return time;
+      const books = await bookResponse(request, env, url);
+      if (books) return books;
       if (url.pathname === '/api/notes' && request.method === 'GET') {
         const trash = url.searchParams.get('trash') === '1';
         const { results } = await env.DB.prepare(
