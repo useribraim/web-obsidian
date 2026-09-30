@@ -15,13 +15,14 @@
   <link rel="mask-icon" href="/mask-icon.svg" color="#202020">
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
+  <script src="/pdf-view.js" defer></script>
   <script src="/books.js" defer></script>
 </head>
 <body>
   <aside>
     <header><span class="brand"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="trash" title="Trash">Trash</button><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button></span></header>
+    <a id="books-open" class="books-link" href="#/books" title="Open your books">Books</a>
     <nav id="notes" aria-label="Notes"></nav>
-    <button id="books-open" class="books-link" title="Open your books">Books</button>
     <section class="timer" aria-label="Time tracker">
       <input id="task" type="text" placeholder="What are you working on?" maxlength="200" autocomplete="off" aria-label="Task description">
       <div class="timer-row"><span id="clock" aria-live="off">0:00:00</span><button id="toggle-timer" class="tool">Start</button></div>
@@ -47,16 +48,17 @@
       </div>
       <div id="reader" class="reader" hidden>
         <div class="reader-bar">
-          <button id="reader-back" class="tool">‹ Library</button>
+          <a id="reader-back" class="tool" href="#/books">‹ Library</a>
           <span id="reader-title" class="reader-title"></span>
-          <select id="reader-toc" class="tool epub-only" aria-label="Contents"></select>
-          <button id="reader-smaller" class="tool epub-only" title="Smaller text" aria-label="Smaller text">A−</button>
-          <button id="reader-larger" class="tool epub-only" title="Larger text" aria-label="Larger text">A+</button>
-          <button id="reader-theme" class="tool epub-only" title="Switch between dark and light">Light</button>
-          <label class="tool pdf-only" title="The browser's PDF viewer cannot report its page. Type the page where you stopped.">Page <input id="reader-page" type="number" min="1" step="1" aria-label="Page number"></label>
-          <button id="reader-prev" class="tool epub-only" aria-label="Previous page">‹</button>
-          <span id="reader-progress" class="reader-progress epub-only"></span>
-          <button id="reader-next" class="tool epub-only" aria-label="Next page">›</button>
+          <select id="reader-toc" class="tool" aria-label="Contents"></select>
+          <button id="reader-smaller" class="tool" title="Smaller text, or zoom out" aria-label="Smaller">A−</button>
+          <button id="reader-larger" class="tool" title="Larger text, or zoom in" aria-label="Larger">A+</button>
+          <button id="reader-theme" class="tool" title="Switch between dark and light">Dark</button>
+          <label class="tool pdf-only">Page <input id="reader-page" type="number" min="1" step="1" aria-label="Page number"><span id="reader-pages"></span></label>
+          <button id="reader-prev" class="tool" aria-label="Previous page">‹</button>
+          <span id="reader-progress" class="reader-progress"></span>
+          <button id="reader-next" class="tool" aria-label="Next page">›</button>
+          <button id="reader-sidebar" class="tool" title="Hide or show the sidebar while you read">Hide sidebar</button>
         </div>
         <div id="reader-stage" class="reader-stage"></div>
       </div>
