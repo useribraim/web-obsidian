@@ -189,79 +189,205 @@ function renderPreview() {
   preview.innerHTML = renderMarkdown(noteText());
   if (compactMode.checked) foldEarlierWeeks();
 }
-// Compact mode folds the day headings ("### 9/11") of every earlier week into
-// one closed line per week, so only the current week stays open. Headings
-// carry no year; a date more than six months ahead belongs to last year.
-const DAY_HEADING = /^(\d{1,2})\/(\d{1,2})(?!\d)/;
-const openWeeks = new Set();
-function dayDate(text) {
-  const match = DAY_HEADING.exec(text.trim());
-  if (!match) return null;
-  const today = new Date();
-  const month = Number(match[1]) - 1;
-  const date = new Date(today.getFullYear(), month, Number(match[2]));
-  if (date.getMonth() !== month) return null;
-  if (date - today > 183 * 86400000) date.setFullYear(date.getFullYear() - 1);
-  return date;
+// Compact mode shows the latest week of a note, and puts every earlier week in a
+// dropdown, grouped by month. A day heading ("### 9/28") carries the date; weeks.js
+// reads it. The latest week is the week of the last dated heading, so a note looks
+// the same on any day. Earlier tasks that are still open are listed above the preview.
+const WEEK_KEY = 'noteWeekPick';
+let weekPick = '';
+try { weekPick = sessionStorage.getItem(WEEK_KEY) || ''; } catch {}
+let carryOpen = true;
+const shortDay = ms => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+const monthName = ms => new Date(ms).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
+function rememberWeekPick(value) {
+  weekPick = value;
+  try { sessionStorage.setItem(WEEK_KEY, value); } catch {}
 }
 function foldEarlierWeeks() {
-  const thisWeek = startOfWeek(new Date()).getTime();
-  const groups = [];
+  const nodes = [...preview.children];
+  const headings = nodes.filter(node => /^H[1-6]$/.test(node.tagName));
+  const dates = NoteWeeks.assignDates(headings.map(node => node.textContent));
+  const dateOf = new Map(headings.map((node, index) => [node, dates[index]]));
+  const latest = NoteWeeks.currentWeek(dates);
+  if (latest === null) return;
+  const byWeek = new Map();
   let group = null;
-  for (const node of [...preview.children]) {
-    const date = /^H[1-6]$/.test(node.tagName) ? dayDate(node.textContent) : null;
+  for (const node of nodes) {
+    const date = dateOf.get(node);
     if (date) {
-      const week = startOfWeek(date).getTime();
-      if (week >= thisWeek) group = null;
-      else if (!group || group.week !== week) {
-        const details = document.createElement('details');
-        details.className = 'week-fold';
-        details.dataset.week = week;
-        details.open = openWeeks.has(week);
-        details.append(document.createElement('summary'));
-        node.before(details);
-        group = { week, details, days: 0 };
-        groups.push(group);
+      const week = NoteWeeks.mondayOf(date).getTime();
+      if (week >= latest) group = null;
+      else {
+        if (!byWeek.has(week)) byWeek.set(week, { week, nodes: [], days: 0 });
+        group = byWeek.get(week);
       }
       if (group) group.days += 1;
     }
-    if (group) group.details.append(node);
+    if (group) { group.nodes.push(node); node.remove(); }
   }
-  for (const { week, details, days } of groups) {
-    const open = details.querySelectorAll('li.task:not(.done)').length;
-    details.firstChild.textContent = 'Week of ' +
-      new Date(week).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) +
-      ' · ' + days + (days === 1 ? ' day' : ' days') +
-      (open ? ' · ' + open + (open === 1 ? ' open task' : ' open tasks') : '');
-  }
+  if (!byWeek.size) return;
+  const groups = [...byWeek.values()].sort((a, b) => b.week - a.week);
+  for (const earlier of groups) earlier.open = earlier.nodes.flatMap(node => [...node.querySelectorAll('li.task:not(.done)')]).map(openTaskCopy).filter(Boolean);
+  const top = document.createElement('div');
+  top.className = 'earlier';
+  top.append(openTaskList(groups), weekPicker(groups));
+  preview.prepend(top);
+  const panel = weekPanel(groups);
+  if (panel) top.after(panel);
 }
+// Tasks left open in earlier weeks stay in view. Ticking one here ticks it in the note.
+function openTaskCopy(task) {
+  const copy = task.cloneNode(true);
+  copy.querySelectorAll('ul, ol').forEach(list => list.remove());
+  return copy.textContent.trim() ? copy : null;
+}
+function openTaskList(groups) {
+  const items = [];
+  for (const group of groups) {
+    for (const copy of group.open) {
+      const from = document.createElement('small');
+      from.className = 'carry-from';
+      from.textContent = 'week of ' + shortDay(group.week);
+      copy.append(from);
+      items.push(copy);
+    }
+  }
+  const fragment = document.createDocumentFragment();
+  if (!items.length) return fragment;
+  const details = document.createElement('details');
+  details.className = 'carry';
+  details.open = carryOpen;
+  const summary = document.createElement('summary');
+  summary.textContent = 'Still open · ' + items.length;
+  const list = document.createElement('ul');
+  list.append(...items);
+  details.append(summary, list);
+  fragment.append(details);
+  return fragment;
+}
+function weekLabel(group) {
+  return 'Week of ' + shortDay(group.week) + ' · ' + plural(group.days, 'day') +
+    (group.open.length ? ' · ' + plural(group.open.length, 'open task') : '');
+}
+function weekPicker(groups) {
+  const select = document.createElement('select');
+  select.className = 'week-select';
+  select.setAttribute('aria-label', 'Earlier weeks');
+  select.append(new Option('Earlier weeks · ' + groups.length, ''));
+  const months = new Map();
+  for (const group of groups) {
+    const key = NoteWeeks.monthKey(group.week);
+    if (!months.has(key)) months.set(key, []);
+    months.get(key).push(group);
+  }
+  for (const [key, list] of months) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = monthName(list[0].week);
+    optgroup.append(new Option('All of ' + monthName(list[0].week) + ' · ' + plural(list.length, 'week'), 'm:' + key));
+    for (const group of list) optgroup.append(new Option(weekLabel(group), 'w:' + group.week));
+    select.append(optgroup);
+  }
+  if (![...select.options].some(option => option.value === weekPick)) weekPick = '';
+  select.value = weekPick;
+  return select;
+}
+function weekPanel(groups) {
+  if (!weekPick) return null;
+  const wholeMonth = weekPick.startsWith('m:');
+  const chosen = groups
+    .filter(group => wholeMonth ? NoteWeeks.monthKey(group.week) === weekPick.slice(2) : group.week === Number(weekPick.slice(2)))
+    .sort((a, b) => a.week - b.week);
+  if (!chosen.length) return null;
+  const panel = document.createElement('section');
+  panel.className = 'week-panel';
+  const head = document.createElement('div');
+  head.className = 'week-panel-head';
+  const title = document.createElement('b');
+  title.textContent = wholeMonth ? monthName(chosen[0].week) : 'Week of ' + shortDay(chosen[0].week);
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'week-close';
+  close.textContent = 'Close';
+  head.append(title, close);
+  panel.append(head);
+  for (const group of chosen) {
+    if (wholeMonth) {
+      const sub = document.createElement('div');
+      sub.className = 'week-sub';
+      sub.textContent = 'Week of ' + shortDay(group.week);
+      panel.append(sub);
+    }
+    panel.append(...group.nodes);
+  }
+  return panel;
+}
+preview.addEventListener('change', event => {
+  if (!event.target.matches('.week-select')) return;
+  rememberWeekPick(event.target.value);
+  renderPreview();
+  preview.querySelector('.week-select')?.focus();
+});
+preview.addEventListener('click', event => {
+  if (!event.target.closest('.week-close')) return;
+  rememberWeekPick('');
+  renderPreview();
+  preview.querySelector('.week-select')?.focus();
+});
 preview.addEventListener('toggle', event => {
-  const details = event.target;
-  if (!details.classList?.contains('week-fold')) return;
-  const week = Number(details.dataset.week);
-  if (details.open) openWeeks.add(week); else openWeeks.delete(week);
+  if (event.target.classList?.contains('carry')) carryOpen = event.target.open;
 }, true);
 // A textarea cannot fold, so compact mode keeps the earlier weeks out of it.
 // They wait in foldedSource, and noteText() joins them back for the preview
-// and for every save, so the stored note never loses them.
+// and for every save, so the stored note never loses them. A bar above the
+// editor says how many lines are hidden, and a button shows them.
 let foldedSource = '';
+let sourceAll = false;
+const foldNote = document.querySelector('#fold-note');
+const foldText = document.querySelector('#fold-text');
+const foldToggle = document.querySelector('#fold-toggle');
 function noteText() { return foldedSource + content.value; }
+// Offset of the first heading in the latest week, or -1 if there is no earlier text.
 function currentWeekStart(text) {
-  const thisWeek = startOfWeek(new Date()).getTime();
+  const headings = [];
   let offset = 0;
-  for (const line of text.split('\n')) {
-    const heading = /^#{1,6}\s+(.*)$/.exec(line);
-    const date = heading && dayDate(heading[1]);
-    if (date && startOfWeek(date).getTime() >= thisWeek) return offset;
+  let fenced = false;
+  for (const line of text.replace(/\r\n?/g, '\n').split('\n')) {
+    const trimmed = line.trim();
+    if (fenced) { if (/^```\s*$/.test(trimmed)) fenced = false; }
+    else if (/^```\w*\s*$/.test(trimmed)) fenced = true;
+    else {
+      const heading = /^#{1,6}\s+(.*)$/.exec(line);
+      if (heading) headings.push({ offset, text: heading[1] });
+    }
     offset += line.length + 1;
+  }
+  const dates = NoteWeeks.assignDates(headings.map(heading => heading.text));
+  const latest = NoteWeeks.currentWeek(dates);
+  if (latest === null) return -1;
+  for (let index = 0; index < dates.length; index += 1) {
+    if (dates[index] && NoteWeeks.mondayOf(dates[index]).getTime() >= latest) return headings[index].offset;
   }
   return -1;
 }
+function updateFoldNote() {
+  const hidden = foldedSource ? foldedSource.split('\n').length - 1 : 0;
+  const canHide = hidden > 0 || (sourceAll && currentWeekStart(noteText()) > 0);
+  foldNote.hidden = !(compactMode.checked && canHide);
+  if (foldNote.hidden) return;
+  foldText.textContent = hidden
+    ? plural(hidden, 'earlier line') + ' hidden here. They stay in the note, and in the dropdown above the preview.'
+    : 'The whole note is shown.';
+  foldToggle.textContent = hidden ? 'Show all' : 'Hide earlier lines';
+}
 function setNoteText(text) {
-  const split = compactMode.checked ? currentWeekStart(text) : -1;
+  const split = compactMode.checked && !sourceAll ? currentWeekStart(text) : -1;
   foldedSource = split > 0 ? text.slice(0, split) : '';
   const shown = text.slice(foldedSource.length);
   if (content.value !== shown) content.value = shown;
+  // The save limit counts the hidden text as well.
+  content.maxLength = Math.max(0, 200000 - foldedSource.length);
+  updateFoldNote();
 }
 // Offsets of every task line, in the order the preview numbers them.
 function taskLineOffsets(source) {
@@ -481,6 +607,7 @@ function resetDraft() {
   showReport(false);
   clearTimeout(timer);
   current = null;
+  sourceAll = false;
   foldedSource = '';
   content.value = '';
   renderPreview();
@@ -493,6 +620,7 @@ function resetDraft() {
 function show(note) {
   showReport(false);
   current = note;
+  sourceAll = false;
   setNoteText(note.content);
   renderPreview();
   dirty = false;
@@ -742,7 +870,8 @@ focusMode.addEventListener('change', () => {
 applyFocus();
 const COMPACT_KEY = 'noteCompact';
 try { compactMode.checked = localStorage.getItem(COMPACT_KEY) === '1'; } catch {}
-compactMode.addEventListener('change', () => {
+// Split or join the source again, keeping the caret on the same text.
+function resplitSource() {
   const folded = foldedSource.length;
   const start = content.selectionStart + folded;
   const end = content.selectionEnd + folded;
@@ -754,7 +883,15 @@ compactMode.addEventListener('change', () => {
   content.setSelectionRange(Math.max(0, start - shift), Math.max(0, end - shift));
   content.scrollTop = 0;
   renderPreview();
+}
+compactMode.addEventListener('change', () => {
+  sourceAll = false;
+  resplitSource();
   try { localStorage.setItem(COMPACT_KEY, compactMode.checked ? '1' : '0'); } catch {}
+});
+foldToggle.addEventListener('click', () => {
+  sourceAll = !sourceAll;
+  resplitSource();
 });
 const SPELL_KEY = 'noteSpellcheck';
 try {

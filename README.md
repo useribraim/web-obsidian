@@ -15,9 +15,21 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
   and not done. Click a check box in the preview to flip it there.
 - Tick **Focus** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
-- Tick **Compact** to fold the day headings (`### 9/11`) of earlier weeks into
-  one line per week, in the preview and in the source. The source shows only
-  the current week; the earlier weeks stay in the note and save with it.
+- Tick **Compact** to show only the latest week of a note. Every earlier week
+  waits in the **Earlier weeks** dropdown above the preview, grouped by month,
+  with the days and open tasks of each week. Pick a week, or **All of** a month,
+  to read it there, and **Close** to put it away. A month needs no heading of
+  its own: it comes from the dates.
+  - The latest week is the week of the last day heading in the note, so the note
+    looks the same on any day. A heading starts with a date: `9/28`, `28/9`,
+    `01/10`, `9.28`, `9/28/2026` or `2026-10-01`. Each date is read against the
+    heading before it, so `01/10` after `9/30` is the 1st of October. Month first
+    wins when both readings fit. A line in a fenced code block is not a heading.
+  - **Still open** lists the tasks left open in earlier weeks, with the week each
+    one came from. Tick one there and it is ticked in the note.
+  - The source shows only the latest week. A bar above it says how many earlier
+    lines are hidden, and **Show all** shows them. They stay in the note and in
+    every save.
 - Double-click a title to rename. Deleted notes go to Trash.
 - A version check rejects a save that would overwrite someone else's edit.
 
