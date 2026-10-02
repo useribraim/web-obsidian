@@ -69,6 +69,20 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - Existing databases need `migrations/0005_add_books.sql`. The Worker also needs
   the R2 bucket described under Deploy.
 
+## Files
+
+- Click **Files** in the sidebar. Upload a file of up to 1 MB with **Upload
+  file** or by dropping it on the page. Any type is accepted, for example a
+  Markdown file.
+- Sign in on another PC or device, open **Files**, and click a file to download
+  it. **Delete** asks twice and removes the file for good.
+- The bytes live in the same R2 bucket as the books, under `files/`. D1 keeps the
+  name and the size.
+- Every download is sent as an attachment with a neutral type, so a file that is
+  HTML or a script is saved and never runs on this site. A name loses any path.
+- The address `#/files` opens the page. The limit is `FILE_LIMIT` in `worker.js`.
+- Existing databases need `migrations/0006_add_files.sql`.
+
 ## Time tracker
 
 - Type a task, press Start. One entry runs at a time.
