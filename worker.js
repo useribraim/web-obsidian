@@ -444,6 +444,73 @@ async function bookResponse(request, env, url) {
   return json({ error: 'Not found.' }, 404);
 }
 
+// File exchange. A file is kept as it was sent, in R2, and D1 keeps its name and
+// size. Any type is accepted, so every download is sent as an attachment with a
+// neutral type: a file that is HTML or a script is saved, never run on this site.
+const FILE_LIMIT = 1_000_000;
+const fileQuery = 'SELECT id, name, size, created_at FROM files WHERE id = ?';
+// A name keeps no path and no control characters, and fits in 200 characters.
+const fileName = (name) => (typeof name === 'string' ? name : '').replace(/[\\/\u0000-\u001f\u007f]/g, '_').trim().slice(0, 200) || 'file';
+function downloadHeaders(file) {
+  const fallback = file.name.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  return {
+    'Content-Type': 'application/octet-stream',
+    'Content-Length': String(file.size),
+    'Content-Disposition': `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+  };
+}
+
+async function fileResponse(request, env, url) {
+  if (!url.pathname.startsWith('/api/files')) return null;
+  if (request.method !== 'GET' && request.method !== 'HEAD' && !sameOrigin(request, url)) return json({ error: 'Invalid origin.' }, 403);
+
+  if (url.pathname === '/api/files' && request.method === 'GET') {
+    const { results } = await env.DB.prepare('SELECT id, name, size, created_at FROM files ORDER BY created_at DESC').all();
+    return json(results);
+  }
+
+  if (url.pathname === '/api/files' && request.method === 'POST') {
+    const length = Number(request.headers.get('Content-Length'));
+    if (!Number.isInteger(length) || length <= 0) return json({ error: 'Choose a file to upload.' }, 411);
+    if (length > FILE_LIMIT) return json({ error: 'This file is too large. The limit is 1 MB.' }, 413);
+    if (!request.body) return json({ error: 'Choose a file to upload.' }, 400);
+    const id = crypto.randomUUID();
+    const key = 'files/' + id;
+    const stored = await env.BOOKS.put(key, request.body);
+    if (stored.size > FILE_LIMIT) {
+      await env.BOOKS.delete(key);
+      return json({ error: 'This file is too large. The limit is 1 MB.' }, 413);
+    }
+    try {
+      await env.DB.prepare('INSERT INTO files (id, name, size) VALUES (?, ?, ?)').bind(id, fileName(url.searchParams.get('name')), stored.size).run();
+    } catch (error) {
+      await env.BOOKS.delete(key);
+      throw error;
+    }
+    return json(await env.DB.prepare(fileQuery).bind(id).first(), 201);
+  }
+
+  const match = /^\/api\/files\/([a-f0-9-]{36})$/.exec(url.pathname);
+  if (!match) return json({ error: 'Not found.' }, 404);
+  const file = await env.DB.prepare(fileQuery).bind(match[1]).first();
+  if (!file) return json({ error: 'File not found.' }, 404);
+
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const object = await env.BOOKS.get('files/' + file.id);
+    if (!object) return json({ error: 'The file is missing.' }, 404);
+    return new Response(request.method === 'HEAD' ? null : object.body, { headers: downloadHeaders(file) });
+  }
+  if (request.method === 'DELETE') {
+    // Delete the stored file first. If that fails, the row stays and the request can be repeated.
+    await env.BOOKS.delete('files/' + file.id);
+    await env.DB.prepare('DELETE FROM files WHERE id = ?').bind(file.id).run();
+    return json({ ok: true });
+  }
+  return json({ error: 'Not found.' }, 404);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -463,6 +530,8 @@ export default {
       if (time) return time;
       const books = await bookResponse(request, env, url);
       if (books) return books;
+      const files = await fileResponse(request, env, url);
+      if (files) return files;
       if (url.pathname === '/api/notes' && request.method === 'GET') {
         const trash = url.searchParams.get('trash') === '1';
         const { results } = await env.DB.prepare(
