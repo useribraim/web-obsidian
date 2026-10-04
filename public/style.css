@@ -197,9 +197,9 @@ body.focus .editor { margin-top: 12px; }
 .books-link:hover { background: #303030; }
 .books-link:focus-visible { outline: 2px solid #a899ce; outline-offset: 2px; }
 .books-link::before { content: '▤'; margin-right: 10px; color: #666; }
-main[data-page="books"] .toolbar, main[data-page="books"] .editor, main[data-page="books"] .fold-note { display: none; }
-.books { display: none; flex: 1; min-height: 0; flex-direction: column; }
-main[data-page="books"] .books { display: flex; }
+main[data-page="books"] .toolbar, main[data-page="books"] .editor, main[data-page="books"] .fold-note, main[data-page="files"] .toolbar, main[data-page="files"] .editor, main[data-page="files"] .fold-note { display: none; }
+.books, .files { display: none; flex: 1; min-height: 0; flex-direction: column; }
+main[data-page="books"] .books, main[data-page="files"] .files { display: flex; }
 .library { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px 48px; flex: 1; min-height: 0; overflow: auto; }
 .books-head { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; }
 .books-head h2 { margin: 0 auto 0 0; font-size: 20px; font-weight: 600; }
@@ -278,3 +278,10 @@ body.focus .fold-note { padding-top: 8px; }
 @media (max-width: 600px) {
   .fold-note { padding: 0 20px; flex-wrap: wrap; }
 }
+
+/* File exchange. It shares the rows of the book library. */
+#files-open::before { content: '⇅'; }
+.files-hint { margin: -10px 0 18px; font-size: 12px; color: #777; }
+.files.book-drop { outline: 2px dashed #a899ce; outline-offset: -6px; background: #a899ce0a; }
+#files-note { font-size: 12px; color: #777; }
+#files-note.error { color: #e7a39c; }

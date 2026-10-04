@@ -18,11 +18,13 @@
   <script src="/app.js" defer></script>
   <script src="/pdf-view.js" defer></script>
   <script src="/books.js" defer></script>
+  <script src="/files.js" defer></script>
 </head>
 <body>
   <aside>
     <header><span class="brand"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="trash" title="Trash">Trash</button><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button></span></header>
     <a id="books-open" class="books-link" href="#/books" title="Open your books">Books</a>
+    <a id="files-open" class="books-link" href="#/files" title="Send a file to your other devices">Files</a>
     <nav id="notes" aria-label="Notes"></nav>
     <section class="timer" aria-label="Time tracker">
       <input id="task" type="text" placeholder="What are you working on?" maxlength="200" autocomplete="off" aria-label="Task description">
@@ -64,6 +66,14 @@
         <div id="reader-stage" class="reader-stage"></div>
       </div>
       <input id="book-file" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" hidden>
+    </section>
+    <section id="files-view" class="files" aria-label="Files">
+      <div class="library">
+        <div class="books-head"><h2>Files</h2><span id="files-note" role="status"></span><button id="files-upload" class="tool">Upload file</button><button id="files-close" class="tool">Back to notes</button></div>
+        <p class="files-hint">Upload a file of up to 1 MB. Sign in on any device to download it.</p>
+        <div id="files-list" class="books-list"></div>
+      </div>
+      <input id="file-input" type="file" multiple hidden>
     </section>
     <div class="toolbar"><span id="status" role="status">Loading…</span><label class="tool checkbox focus-toggle" title="Show only the note, its preview, and the timer"><input type="checkbox" id="focus-mode"> Focus</label><label class="tool checkbox compact-toggle" title="Fold the day headings of earlier weeks, and keep the current week open"><input type="checkbox" id="compact-mode"> Compact</label><span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span><button id="bold" class="tool" title="Bold (⌘B)" aria-label="Bold">B</button><button id="italic" class="tool" title="Italic (⌘I)" aria-label="Italic">I</button><label class="tool checkbox" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label><button id="delete" class="tool">Delete</button><button id="restore" class="tool" hidden>Restore</button><button id="purge" class="tool" hidden>Delete forever</button><button id="save" class="tool">Save <kbd>⌘S</kbd></button></div>
     <div id="fold-note" class="fold-note" hidden><span id="fold-text"></span><button id="fold-toggle" class="tool" type="button">Show all</button></div>

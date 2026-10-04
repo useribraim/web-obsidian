@@ -1460,6 +1460,7 @@ function renderReport() {
 }
 function showReport(open) {
   window.closeBooks?.();
+  window.closeFiles?.();
   main.dataset.page = open ? 'report' : 'notes';
   reportView.hidden = !open;
   if (open) renderReport();
