@@ -195,14 +195,25 @@ function renderPreview() {
 // the same on any day. Earlier tasks that are still open are listed above the preview.
 const WEEK_KEY = 'noteWeekPick';
 let weekPick = '';
-try { weekPick = sessionStorage.getItem(WEEK_KEY) || ''; } catch {}
+let weekPickNote;
 let carryOpen = true;
 const shortDay = ms => new Date(ms).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 const monthName = ms => new Date(ms).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
 function rememberWeekPick(value) {
   weekPick = value;
-  try { sessionStorage.setItem(WEEK_KEY, value); } catch {}
+  try { sessionStorage.setItem(WEEK_KEY, JSON.stringify({ id: weekPickNote, pick: value })); } catch {}
+}
+// The week you chose belongs to the note you chose it in. It survives a reload of
+// the page, and it does not follow you to another note.
+function restoreWeekPick(id) {
+  if (weekPickNote === id) return;
+  weekPickNote = id;
+  weekPick = '';
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(WEEK_KEY) || 'null');
+    if (saved && saved.id === id) weekPick = saved.pick || '';
+  } catch {}
 }
 function foldEarlierWeeks() {
   const nodes = [...preview.children];
@@ -212,6 +223,8 @@ function foldEarlierWeeks() {
   const latest = NoteWeeks.currentWeek(dates);
   if (latest === null) return;
   const byWeek = new Map();
+  const intro = [];
+  let seenDay = false;
   let group = null;
   for (const node of nodes) {
     const date = dateOf.get(node);
@@ -221,9 +234,13 @@ function foldEarlierWeeks() {
       else {
         if (!byWeek.has(week)) byWeek.set(week, { week, nodes: [], days: 0 });
         group = byWeek.get(week);
+        // Lines above the first day heading belong to the first earlier week. The
+        // source hides them with it, so the preview must too.
+        if (!seenDay) { group.nodes.push(...intro); intro.forEach(item => item.remove()); }
       }
+      seenDay = true;
       if (group) group.days += 1;
-    }
+    } else if (!seenDay) intro.push(node);
     if (group) { group.nodes.push(node); node.remove(); }
   }
   if (!byWeek.size) return;
@@ -365,6 +382,8 @@ function currentWeekStart(text) {
   const dates = NoteWeeks.assignDates(headings.map(heading => heading.text));
   const latest = NoteWeeks.currentWeek(dates);
   if (latest === null) return -1;
+  // With no earlier week there is nothing to fold, so nothing is hidden.
+  if (!dates.some(date => date && NoteWeeks.mondayOf(date).getTime() < latest)) return -1;
   for (let index = 0; index < dates.length; index += 1) {
     if (dates[index] && NoteWeeks.mondayOf(dates[index]).getTime() >= latest) return headings[index].offset;
   }
@@ -381,6 +400,9 @@ function updateFoldNote() {
   foldToggle.textContent = hidden ? 'Show all' : 'Hide earlier lines';
 }
 function setNoteText(text) {
+  // A textarea turns CRLF into LF. Do the same for the whole note, so the offsets below
+  // and the hidden part agree with what the editor shows.
+  text = text.replace(/\r\n?/g, '\n');
   const split = compactMode.checked && !sourceAll ? currentWeekStart(text) : -1;
   foldedSource = split > 0 ? text.slice(0, split) : '';
   const shown = text.slice(foldedSource.length);
@@ -608,6 +630,7 @@ function resetDraft() {
   clearTimeout(timer);
   current = null;
   sourceAll = false;
+  restoreWeekPick(null);
   foldedSource = '';
   content.value = '';
   renderPreview();
@@ -621,6 +644,7 @@ function show(note) {
   showReport(false);
   current = note;
   sourceAll = false;
+  restoreWeekPick(note.id);
   setNoteText(note.content);
   renderPreview();
   dirty = false;
@@ -888,6 +912,12 @@ compactMode.addEventListener('change', () => {
   sourceAll = false;
   resplitSource();
   try { localStorage.setItem(COMPACT_KEY, compactMode.checked ? '1' : '0'); } catch {}
+});
+// Starting a new week changes what the preview folds. The editor catches up when
+// you leave it, so the text never moves under the caret while you type.
+content.addEventListener('blur', () => {
+  if (!compactMode.checked || sourceAll) return;
+  if (Math.max(0, currentWeekStart(noteText())) !== foldedSource.length) resplitSource();
 });
 foldToggle.addEventListener('click', () => {
   sourceAll = !sourceAll;

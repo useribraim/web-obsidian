@@ -27,6 +27,13 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
     wins when both readings fit. A line in a fenced code block is not a heading.
   - **Still open** lists the tasks left open in earlier weeks, with the week each
     one came from. Tick one there and it is ticked in the note.
+  - Lines above the first day heading, such as a title, count as earlier text:
+    they fold with the first earlier week, in the source and in the preview. If
+    a note has no earlier week, nothing is hidden.
+  - The week you pick belongs to the note you picked it in.
+  - Compact expects the newest day at the bottom. A note with the newest day at
+    the top is shown in full. A heading that starts with a fraction, such as
+    `1/2 cup`, is read as a date.
   - The source shows only the latest week. A bar above it says how many earlier
     lines are hidden, and **Show all** shows them. They stay in the note and in
     every save.
