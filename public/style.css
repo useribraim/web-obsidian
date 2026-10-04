@@ -126,7 +126,7 @@ textarea::placeholder { color: #626262; }
 .timer-summary b { font-weight: 550; color: #c9bcdf; font-variant-numeric: tabular-nums; margin-left: 4px; }
 
 /* Time report page. */
-main[data-page="report"] .toolbar, main[data-page="report"] .editor { display: none; }
+main[data-page="report"] .toolbar, main[data-page="report"] .editor, main[data-page="report"] .fold-note { display: none; }
 .report { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px 48px; flex: 1; min-height: 0; overflow: auto; }
 .report-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
 .report-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
@@ -192,18 +192,12 @@ body.focus .editor { margin-top: 12px; }
   body.focus #preview { border-top: 1px solid #292929; padding-top: 12px; }
 }
 
-/* Compact mode: one closed line for each earlier week. */
-#preview .week-fold { margin: 0 0 .5em; }
-#preview .week-fold > summary { cursor: pointer; padding: 6px 10px; color: #999; font-size: .85em; background: #191919; border: 1px solid #292929; border-radius: 6px; }
-#preview .week-fold > summary:hover { color: #c9bcdf; border-color: #4a4159; }
-#preview .week-fold[open] > summary { margin-bottom: .75em; }
-
 /* Books: the library, and the reader. */
 .books-link { display: block; width: 100%; margin: 0 0 6px; padding: 10px 12px; text-align: left; font-size: 13px; color: #999; text-decoration: none; border-radius: 5px; }
 .books-link:hover { background: #303030; }
 .books-link:focus-visible { outline: 2px solid #a899ce; outline-offset: 2px; }
 .books-link::before { content: '▤'; margin-right: 10px; color: #666; }
-main[data-page="books"] .toolbar, main[data-page="books"] .editor, main[data-page="files"] .toolbar, main[data-page="files"] .editor { display: none; }
+main[data-page="books"] .toolbar, main[data-page="books"] .editor, main[data-page="books"] .fold-note, main[data-page="files"] .toolbar, main[data-page="files"] .editor, main[data-page="files"] .fold-note { display: none; }
 .books, .files { display: none; flex: 1; min-height: 0; flex-direction: column; }
 main[data-page="books"] .books, main[data-page="files"] .files { display: flex; }
 .library { width: 100%; max-width: 900px; margin: 0 auto; padding: 28px 32px 48px; flex: 1; min-height: 0; overflow: auto; }
@@ -262,6 +256,28 @@ body.focus .books-link { display: none; }
 
 /* Reading without the sidebar. */
 body.reading-full aside { display: none; }
+
+/* Compact mode: the latest week, and a dropdown for the weeks before it. */
+.fold-note { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 32px; font-size: 12px; color: #999; }
+.fold-note[hidden] { display: none; }
+#fold-text { flex: 1; min-width: 0; }
+body.focus .fold-note { padding-top: 8px; }
+#preview .earlier { margin: 0 0 1em; padding: 0 0 .8em; border-bottom: 1px solid #292929; font-size: .9em; }
+#preview .week-select { width: 100%; padding: 8px 10px; font: inherit; font-size: .95em; color: #c9bcdf; background: #191919; border: 1px solid #292929; border-radius: 6px; color-scheme: dark; cursor: pointer; }
+#preview .week-select:hover { border-color: #4a4159; }
+#preview .week-select:focus-visible { outline: 2px solid #a899ce; outline-offset: 2px; }
+#preview .carry { margin: 0 0 .6em; background: #191919; border: 1px solid #292929; border-radius: 6px; }
+#preview .carry > summary { cursor: pointer; padding: 7px 10px; color: #b9b2c9; }
+#preview .carry ul { margin: 0; padding: .1em 10px .6em 2.3em; max-height: 14em; overflow: auto; }
+#preview .carry-from { margin-left: .7em; color: #777; font-size: .8em; white-space: nowrap; }
+#preview .week-panel { margin: 0 0 1.2em; padding: 12px 16px 4px; border: 1px solid #3d3550; border-radius: 8px; background: #1a1920; }
+#preview .week-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .6em; color: #c9bcdf; }
+#preview .week-close { padding: 5px 10px; font-size: .85em; color: #c9bcdf; background: #232323; border: 1px solid #333; border-radius: 6px; }
+#preview .week-close:hover { background: #2c2c2c; }
+#preview .week-sub { margin: 1.2em 0 .3em; padding-top: .8em; border-top: 1px solid #2b2733; color: #8b8499; font-size: .8em; letter-spacing: .04em; text-transform: uppercase; }
+@media (max-width: 600px) {
+  .fold-note { padding: 0 20px; flex-wrap: wrap; }
+}
 
 /* File exchange. It shares the rows of the book library. */
 #files-open::before { content: '⇅'; }
