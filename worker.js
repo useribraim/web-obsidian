@@ -534,6 +534,15 @@ export default {
       if (files) return files;
       if (url.pathname === '/api/notes' && request.method === 'GET') {
         const trash = url.searchParams.get('trash') === '1';
+        const term = (url.searchParams.get('q') || '').trim().slice(0, 100);
+        if (term && !trash) {
+          // The % and _ the person typed are plain letters here, not wildcards.
+          const like = '%' + term.replace(/[\\%_]/g, '\\$&') + '%';
+          const found = await env.DB.prepare(
+            "SELECT id, title, updated_at, deleted_at FROM notes WHERE deleted_at IS NULL AND (title LIKE ?1 ESCAPE '\\' OR content LIKE ?1 ESCAPE '\\') ORDER BY updated_at DESC LIMIT 50"
+          ).bind(like).all();
+          return json(found.results);
+        }
         const { results } = await env.DB.prepare(
           trash
             ? 'SELECT id, title, updated_at, deleted_at FROM notes WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC'

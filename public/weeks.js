@@ -14,6 +14,12 @@
   // less likely than one after it. The first heading has no such rule: it is
   // measured against today, and an old note starts in the past.
   const BACKWARD_PENALTY = 30;
+  // "3 oct 2026", "Oct 3", "10 October", "Mon 5th Oct". The whole word must be a month,
+  // so "5 minutes" is not a date.
+  const MONTHS = { jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11 };
+  const WEEKDAY = '(?:(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\\.?,?\\s+)?';
+  const DAY_MONTH = new RegExp('^' + WEEKDAY + '(\\d{1,2})(?:st|nd|rd|th)?\\s+([a-z]{3,9})\\.?(?:,?\\s+(\\d{4}))?(?![\\w])', 'i');
+  const MONTH_DAY = new RegExp('^' + WEEKDAY + '([a-z]{3,9})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?(?![\\w])', 'i');
   const ISO_DAY = /^(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
   const SLASH_DAY = /^(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?(?!\d)/;
 
@@ -35,7 +41,7 @@
     const iso = ISO_DAY.exec(trimmed);
     if (iso) return validDate(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
     const match = SLASH_DAY.exec(trimmed);
-    if (!match) return null;
+    if (!match) return parseNamedDay(trimmed, anchor, fromHeading);
     const first = Number(match[1]);
     const second = Number(match[2]);
     let year = null;
@@ -43,6 +49,11 @@
     const readings = [];
     if (first >= 1 && first <= 12) readings.push({ month: first - 1, day: second, penalty: 0 });
     if (second >= 1 && second <= 12 && second !== first) readings.push({ month: second - 1, day: first, penalty: DAY_FIRST_PENALTY });
+    return bestReading(readings, year, anchor, fromHeading);
+  }
+
+  // The reading, and the year, that sit closest to the anchor.
+  function bestReading(readings, year, anchor, fromHeading) {
     let best = null;
     for (const reading of readings) {
       const years = year ? [year] : [anchor.getFullYear() - 1, anchor.getFullYear(), anchor.getFullYear() + 1];
@@ -56,6 +67,18 @@
     return best ? best.date : null;
   }
 
+  // A month written as a word: "3 oct 2026" or "Oct 3".
+  function parseNamedDay(trimmed, anchor, fromHeading) {
+    let day, name, year;
+    let match = DAY_MONTH.exec(trimmed);
+    if (match) [, day, name, year] = match;
+    else if ((match = MONTH_DAY.exec(trimmed))) [, name, day, year] = match;
+    else return null;
+    const month = MONTHS[name.toLowerCase()];
+    if (month === undefined) return null;
+    return bestReading([{ month, day: Number(day), penalty: 0 }], year ? Number(year) : null, anchor, fromHeading);
+  }
+
   // One date, or null, for each heading text, in order.
   function assignDates(texts, today = new Date()) {
     let anchor = today;
@@ -67,14 +90,21 @@
     });
   }
 
-  // The current week is the week of the last dated heading. It does not depend
-  // on the clock, so the note looks the same on any day.
-  function currentWeek(dates) {
-    for (let index = dates.length - 1; index >= 0; index -= 1) if (dates[index]) return mondayOf(dates[index]).getTime();
+  // The last day heading of a note ends the window. It does not depend on the
+  // clock, so the note looks the same on any day.
+  function lastDay(dates) {
+    for (let index = dates.length - 1; index >= 0; index -= 1) if (dates[index]) return dates[index];
     return null;
+  }
+
+  // Compact mode keeps this many days open, counting the last day heading.
+  const DAYS_SHOWN = 5;
+  // Midnight of the oldest day that stays open.
+  function shownFromDay(last, count = DAYS_SHOWN) {
+    return new Date(last.getFullYear(), last.getMonth(), last.getDate() - (count - 1)).getTime();
   }
 
   const monthKey = week => { const date = new Date(week); return date.getFullYear() + '-' + date.getMonth(); };
 
-  root.NoteWeeks = { mondayOf, parseDay, assignDates, currentWeek, monthKey };
+  root.NoteWeeks = { mondayOf, parseDay, assignDates, lastDay, shownFromDay, monthKey };
 })(typeof window !== 'undefined' ? window : module.exports);
