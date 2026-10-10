@@ -3,17 +3,20 @@ const preview = document.querySelector('#preview');
 const editor = document.querySelector('#editor');
 const list = document.querySelector('#notes');
 const status = document.querySelector('#status');
-const save = document.querySelector('#save');
 const newButton = document.querySelector('#new');
 const trashButton = document.querySelector('#trash');
+const trashLabel = document.querySelector('#trash .bin-label');
+const bin = document.querySelector('#trash .bin');
 const deleteButton = document.querySelector('#delete');
 const restoreButton = document.querySelector('#restore');
 const purgeButton = document.querySelector('#purge');
-const bold = document.querySelector('#bold');
-const italic = document.querySelector('#italic');
 const viewButtons = [...document.querySelectorAll('.view-option')];
 const spellcheck = document.querySelector('#spellcheck');
-const compactMode = document.querySelector('#compact-mode');
+const unravelButton = document.querySelector('#unravel');
+// Notes open compact: the last five days, and the rest behind a dropdown. The
+// quiet button beside the view buttons unravels the whole note. It is not
+// remembered, so every visit starts compact.
+let unraveled = false;
 const size = document.querySelector('#size');
 const logout = document.querySelector('#logout');
 const imageFile = document.querySelector('#image-file');
@@ -22,7 +25,7 @@ imageButton.id = 'add-image';
 imageButton.className = 'tool';
 imageButton.textContent = 'Image';
 imageButton.title = 'Upload an image, paste a screenshot, or drop an image into your note';
-document.querySelector('.toolbar').insertBefore(imageButton, deleteButton);
+document.querySelector('#format-group').append(imageButton);
 let insertingImage = false;
 const AUTOSAVE_DELAY = 2500;
 let current = null;
@@ -187,12 +190,12 @@ function renderPreview() {
   if (editor.dataset.view === 'edit') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());
-  if (compactMode.checked) foldEarlierWeeks();
+  if (!unraveled) foldEarlierWeeks();
 }
-// Compact mode shows the latest week of a note, and puts every earlier week in a
-// dropdown, grouped by month. A day heading ("### 9/28") carries the date; weeks.js
-// reads it. The latest week is the week of the last dated heading, so a note looks
-// the same on any day. Earlier tasks that are still open are listed above the preview.
+// Compact mode shows the last five days of a note, and puts every earlier day in a
+// dropdown, grouped by week and month. A day heading ("### 9/28") carries the date; weeks.js
+// reads it. The five days end on the last dated heading, so a note looks the same
+// on any day. Earlier tasks that are still open are listed above the preview.
 const WEEK_KEY = 'noteWeekPick';
 let weekPick = '';
 let weekPickNote;
@@ -220,8 +223,9 @@ function foldEarlierWeeks() {
   const headings = nodes.filter(node => /^H[1-6]$/.test(node.tagName));
   const dates = NoteWeeks.assignDates(headings.map(node => node.textContent));
   const dateOf = new Map(headings.map((node, index) => [node, dates[index]]));
-  const latest = NoteWeeks.currentWeek(dates);
-  if (latest === null) return;
+  const last = NoteWeeks.lastDay(dates);
+  if (!last) return;
+  const cutoff = NoteWeeks.shownFromDay(last);
   const byWeek = new Map();
   const intro = [];
   let seenDay = false;
@@ -230,10 +234,11 @@ function foldEarlierWeeks() {
     const date = dateOf.get(node);
     if (date) {
       const week = NoteWeeks.mondayOf(date).getTime();
-      if (week >= latest) group = null;
+      if (date.getTime() >= cutoff) group = null;
       else {
-        if (!byWeek.has(week)) byWeek.set(week, { week, nodes: [], days: 0 });
+        if (!byWeek.has(week)) byWeek.set(week, { week, nodes: [], days: 0, last: 0 });
         group = byWeek.get(week);
+        group.last = Math.max(group.last, date.getTime());
         // Lines above the first day heading belong to the first earlier week. The
         // source hides them with it, so the preview must too.
         if (!seenDay) { group.nodes.push(...intro); intro.forEach(item => item.remove()); }
@@ -294,14 +299,15 @@ function weekPicker(groups) {
   select.append(new Option('Earlier weeks · ' + groups.length, ''));
   const months = new Map();
   for (const group of groups) {
-    const key = NoteWeeks.monthKey(group.week);
+    // A week that spans two months sits in the month of its latest day.
+    const key = NoteWeeks.monthKey(group.last);
     if (!months.has(key)) months.set(key, []);
     months.get(key).push(group);
   }
   for (const [key, list] of months) {
     const optgroup = document.createElement('optgroup');
-    optgroup.label = monthName(list[0].week);
-    optgroup.append(new Option('All of ' + monthName(list[0].week) + ' · ' + plural(list.length, 'week'), 'm:' + key));
+    optgroup.label = monthName(list[0].last);
+    optgroup.append(new Option('All of ' + monthName(list[0].last) + ' · ' + plural(list.length, 'week'), 'm:' + key));
     for (const group of list) optgroup.append(new Option(weekLabel(group), 'w:' + group.week));
     select.append(optgroup);
   }
@@ -313,7 +319,7 @@ function weekPanel(groups) {
   if (!weekPick) return null;
   const wholeMonth = weekPick.startsWith('m:');
   const chosen = groups
-    .filter(group => wholeMonth ? NoteWeeks.monthKey(group.week) === weekPick.slice(2) : group.week === Number(weekPick.slice(2)))
+    .filter(group => wholeMonth ? NoteWeeks.monthKey(group.last) === weekPick.slice(2) : group.week === Number(weekPick.slice(2)))
     .sort((a, b) => a.week - b.week);
   if (!chosen.length) return null;
   const panel = document.createElement('section');
@@ -321,7 +327,7 @@ function weekPanel(groups) {
   const head = document.createElement('div');
   head.className = 'week-panel-head';
   const title = document.createElement('b');
-  title.textContent = wholeMonth ? monthName(chosen[0].week) : 'Week of ' + shortDay(chosen[0].week);
+  title.textContent = wholeMonth ? monthName(chosen[0].last) : 'Week of ' + shortDay(chosen[0].week);
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'week-close';
@@ -359,13 +365,12 @@ preview.addEventListener('toggle', event => {
 // and for every save, so the stored note never loses them. A bar above the
 // editor says how many lines are hidden, and a button shows them.
 let foldedSource = '';
-let sourceAll = false;
 const foldNote = document.querySelector('#fold-note');
 const foldText = document.querySelector('#fold-text');
 const foldToggle = document.querySelector('#fold-toggle');
 function noteText() { return foldedSource + content.value; }
-// Offset of the first heading in the latest week, or -1 if there is no earlier text.
-function currentWeekStart(text) {
+// Offset of the first heading of the oldest day that stays open, or -1 if there is no earlier text.
+function openFromOffset(text) {
   const headings = [];
   let offset = 0;
   let fenced = false;
@@ -380,30 +385,30 @@ function currentWeekStart(text) {
     offset += line.length + 1;
   }
   const dates = NoteWeeks.assignDates(headings.map(heading => heading.text));
-  const latest = NoteWeeks.currentWeek(dates);
-  if (latest === null) return -1;
+  const last = NoteWeeks.lastDay(dates);
+  if (!last) return -1;
+  const cutoff = NoteWeeks.shownFromDay(last);
   // With no earlier week there is nothing to fold, so nothing is hidden.
-  if (!dates.some(date => date && NoteWeeks.mondayOf(date).getTime() < latest)) return -1;
+  if (!dates.some(date => date && date.getTime() < cutoff)) return -1;
   for (let index = 0; index < dates.length; index += 1) {
-    if (dates[index] && NoteWeeks.mondayOf(dates[index]).getTime() >= latest) return headings[index].offset;
+    if (dates[index] && dates[index].getTime() >= cutoff) return headings[index].offset;
   }
   return -1;
 }
 function updateFoldNote() {
   const hidden = foldedSource ? foldedSource.split('\n').length - 1 : 0;
-  const canHide = hidden > 0 || (sourceAll && currentWeekStart(noteText()) > 0);
-  foldNote.hidden = !(compactMode.checked && canHide);
+  const canHide = hidden > 0 || (unraveled && openFromOffset(noteText()) > 0);
+  foldNote.hidden = !canHide;
   if (foldNote.hidden) return;
-  foldText.textContent = hidden
-    ? plural(hidden, 'earlier line') + ' hidden here. They stay in the note, and in the dropdown above the preview.'
-    : 'The whole note is shown.';
+  foldText.textContent = hidden ? plural(hidden, 'earlier line') + ' hidden' : 'Whole note shown';
+  foldNote.title = hidden ? 'They stay in the note, and in the dropdown above the preview.' : '';
   foldToggle.textContent = hidden ? 'Show all' : 'Hide earlier lines';
 }
 function setNoteText(text) {
   // A textarea turns CRLF into LF. Do the same for the whole note, so the offsets below
   // and the hidden part agree with what the editor shows.
   text = text.replace(/\r\n?/g, '\n');
-  const split = compactMode.checked && !sourceAll ? currentWeekStart(text) : -1;
+  const split = unraveled ? -1 : openFromOffset(text);
   foldedSource = split > 0 ? text.slice(0, split) : '';
   const shown = text.slice(foldedSource.length);
   if (content.value !== shown) content.value = shown;
@@ -528,8 +533,6 @@ function wrapSelection(marker) {
 function updateControls() {
   const trashed = Boolean(current?.deleted_at);
   content.disabled = busy || trashed || (mode === 'trash' && !current);
-  save.disabled = busy;
-  save.hidden = mode === 'trash' || trashed;
   deleteButton.hidden = mode === 'trash';
   deleteButton.disabled = busy;
   restoreButton.hidden = !trashed;
@@ -539,23 +542,66 @@ function updateControls() {
   newButton.hidden = mode === 'trash';
   newButton.disabled = busy;
   const readOnly = mode === 'trash' || trashed;
-  bold.hidden = readOnly;
   imageButton.hidden = readOnly;
   imageButton.disabled = busy;
-  italic.hidden = readOnly;
-  bold.disabled = busy;
-  italic.disabled = busy;
-  trashButton.textContent = mode === 'trash' ? 'Back' : 'Trash';
+  trashLabel.textContent = mode === 'trash' ? 'Back' : 'Trash';
   trashButton.title = mode === 'trash' ? 'Back to notes' : 'Trash';
+}
+// The last-edited date under each title: a time today, "Yesterday", or the day.
+function noteDate(iso) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  const days = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86400000);
+  if (days === 0) return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  if (days === 1) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: days > 300 ? 'numeric' : undefined });
+}
+// Search looks in titles and in the text. The list shows the matches until the box is empty.
+const searchBox = document.querySelector('#search');
+let searchQuery = '';
+let searchResults = [];
+let searchTimer = 0;
+searchBox.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchQuery = searchBox.value.trim();
+  if (!searchQuery) { render(); return; }
+  searchTimer = setTimeout(async () => {
+    const asked = searchQuery;
+    try {
+      const found = await api('?q=' + encodeURIComponent(asked));
+      if (asked === searchQuery) { searchResults = found; render(); }
+    } catch (error) { message(error.message, true); }
+  }, 250);
+});
+searchBox.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !searchBox.value) return;
+  event.preventDefault();
+  searchBox.value = '';
+  searchQuery = '';
+  render();
+});
+// The bin shows paper when the trash holds a note.
+async function refreshBin() {
+  try {
+    const trashed = await api('?trash=1');
+    bin.classList.toggle('full', trashed.length > 0);
+  } catch {}
 }
 function render() {
   if (renaming) return;
   list.replaceChildren();
-  for (const note of notes) {
+  const shown = mode === 'active' && searchQuery ? searchResults : notes;
+  for (const note of shown) {
     const button = document.createElement('button');
     button.className = 'note' + (note.id === current?.id ? ' active' : '');
     button.dataset.id = note.id;
-    button.textContent = note.title;
+    const name = document.createElement('span');
+    name.className = 'note-title';
+    name.textContent = note.title;
+    const when = document.createElement('span');
+    when.className = 'note-date';
+    when.textContent = noteDate(note.updated_at || note.deleted_at);
+    button.append(name, when);
     button.title = mode === 'active' ? note.title + ' — double-click to rename' : note.title;
     button.onclick = () => {
       const now = Date.now();
@@ -569,10 +615,10 @@ function render() {
     };
     list.append(button);
   }
-  if (!notes.length) {
+  if (!shown.length) {
     const empty = document.createElement('div');
     empty.className = 'empty';
-    empty.textContent = mode === 'trash' ? 'Trash is empty.' : 'Your first page starts here.';
+    empty.textContent = mode === 'trash' ? 'Trash is empty.' : searchQuery ? 'No note matches.' : 'Your first page starts here.';
     list.append(empty);
   }
 }
@@ -629,7 +675,6 @@ function resetDraft() {
   showReport(false);
   clearTimeout(timer);
   current = null;
-  sourceAll = false;
   restoreWeekPick(null);
   foldedSource = '';
   content.value = '';
@@ -643,7 +688,6 @@ function resetDraft() {
 function show(note) {
   showReport(false);
   current = note;
-  sourceAll = false;
   restoreWeekPick(note.id);
   setNoteText(note.content);
   renderPreview();
@@ -749,6 +793,7 @@ trashButton.onclick = async () => {
   } catch (error) { message(error.message, true); }
   finally { setBusy(false); }
   if (mode === 'active') {
+    refreshBin();
     if (notes.length) await openNote(notes[0].id);
     else { message('New note'); content.focus(); }
   }
@@ -772,6 +817,7 @@ deleteButton.onclick = async () => {
     current = null;
     dirty = false;
     message('Moved to trash');
+    refreshBin();
     moveOn = true;
   } catch (error) { message(error.message, true); }
   finally { setBusy(false); }
@@ -790,6 +836,7 @@ restoreButton.onclick = async () => {
     notes = await api('');
     show(note);
     message('Restored');
+    refreshBin();
   } catch (error) { message(error.message, true); }
   finally { setBusy(false); }
 };
@@ -804,6 +851,7 @@ purgeButton.onclick = async () => {
     current = null;
     dirty = false;
     message('Deleted forever');
+    refreshBin();
     moveOn = true;
   } catch (error) { message(error.message, true); }
   finally { setBusy(false); }
@@ -818,16 +866,25 @@ content.addEventListener('input', event => {
   message(blocked ? blockedMessage : 'Unsaved', blocked);
   schedule();
 });
-let syncingScroll = false;
-content.addEventListener('scroll', () => {
-  if (syncingScroll || editor.dataset.view === 'preview') return;
-  const from = content.scrollHeight - content.clientHeight;
-  const to = preview.scrollHeight - preview.clientHeight;
-  if (from <= 0 || to <= 0) return;
-  syncingScroll = true;
-  preview.scrollTop = (content.scrollTop / from) * to;
-  requestAnimationFrame(() => { syncingScroll = false; });
-});
+// In split view the two panes scroll together, whichever one you scroll. A pane that
+// was moved by the other is not allowed to move the first one back.
+const movedByCode = new Set();
+function followScroll(from, to) {
+  from.addEventListener('scroll', () => {
+    if (movedByCode.delete(from) || editor.dataset.view !== 'split') return;
+    const fromRange = from.scrollHeight - from.clientHeight;
+    const toRange = to.scrollHeight - to.clientHeight;
+    if (fromRange <= 0 || toRange <= 0) return;
+    const next = (from.scrollTop / fromRange) * toRange;
+    if (Math.abs(to.scrollTop - next) < 1) return;
+    movedByCode.add(to);
+    to.scrollTop = next;
+    // If the browser did not report a scroll, do not leave the mark behind.
+    requestAnimationFrame(() => requestAnimationFrame(() => movedByCode.delete(to)));
+  }, { passive: true });
+}
+followScroll(content, preview);
+followScroll(preview, content);
 let tabMovesFocus = false;
 function editorKeydown(event) {
   const content = event.currentTarget;
@@ -852,8 +909,6 @@ function editorKeydown(event) {
 }
 content.addEventListener('keydown', editorKeydown);
 content.addEventListener('blur', () => { tabMovesFocus = false; });
-bold.onclick = () => wrapSelection('**');
-italic.onclick = () => wrapSelection('*');
 const VIEW_KEY = 'noteView';
 try {
   const saved = localStorage.getItem(VIEW_KEY);
@@ -892,8 +947,6 @@ focusMode.addEventListener('change', () => {
   try { localStorage.setItem(FOCUS_KEY, focusMode.checked ? '1' : '0'); } catch {}
 });
 applyFocus();
-const COMPACT_KEY = 'noteCompact';
-try { compactMode.checked = localStorage.getItem(COMPACT_KEY) === '1'; } catch {}
 // Split or join the source again, keeping the caret on the same text.
 function resplitSource() {
   const folded = foldedSource.length;
@@ -908,20 +961,25 @@ function resplitSource() {
   content.scrollTop = 0;
   renderPreview();
 }
-compactMode.addEventListener('change', () => {
-  sourceAll = false;
+function showUnraveled() {
+  unravelButton.setAttribute('aria-pressed', String(unraveled));
+  unravelButton.textContent = unraveled ? '⤡' : '⤢';
+  unravelButton.title = unraveled ? 'Fold the earlier weeks again' : 'Unravel: show every week and day';
+  unravelButton.setAttribute('aria-label', unravelButton.title);
+}
+function toggleUnravel() {
+  unraveled = !unraveled;
+  showUnraveled();
   resplitSource();
-  try { localStorage.setItem(COMPACT_KEY, compactMode.checked ? '1' : '0'); } catch {}
-});
+}
+unravelButton.addEventListener('click', toggleUnravel);
+foldToggle.addEventListener('click', toggleUnravel);
+showUnraveled();
 // Starting a new week changes what the preview folds. The editor catches up when
 // you leave it, so the text never moves under the caret while you type.
 content.addEventListener('blur', () => {
-  if (!compactMode.checked || sourceAll) return;
-  if (Math.max(0, currentWeekStart(noteText())) !== foldedSource.length) resplitSource();
-});
-foldToggle.addEventListener('click', () => {
-  sourceAll = !sourceAll;
-  resplitSource();
+  if (unraveled) return;
+  if (Math.max(0, openFromOffset(noteText())) !== foldedSource.length) resplitSource();
 });
 const SPELL_KEY = 'noteSpellcheck';
 try {
@@ -933,7 +991,6 @@ spellcheck.addEventListener('change', () => {
   try { localStorage.setItem(SPELL_KEY, spellcheck.checked ? '1' : '0'); } catch {}
 });
 applySpellcheck();
-save.onclick = saveNote;
 document.addEventListener('keydown', event => {
   if (!(event.metaKey || event.ctrlKey)) return;
   const key = event.key.toLowerCase();
@@ -943,6 +1000,9 @@ document.addEventListener('keydown', event => {
   } else if ((key === 'b' || key === 'i') && document.activeElement === content) {
     event.preventDefault();
     if (mode === 'active') wrapSelection(key === 'b' ? '**' : '*');
+  } else if (key === '\\' && !event.shiftKey && !event.altKey) {
+    event.preventDefault();
+    applyCollapsed(!document.body.classList.contains('collapsed'));
   } else if (key === 'l' && document.activeElement === content && !event.shiftKey && !event.altKey) {
     event.preventDefault();
     toggleTasks();
@@ -951,7 +1011,22 @@ document.addEventListener('keydown', event => {
 window.addEventListener('beforeunload', event => {
   if (dirty && mode === 'active') { event.preventDefault(); event.returnValue = ''; }
 });
-if (!/Mac|iPhone|iPad/.test(navigator.platform)) document.querySelector('kbd').textContent = 'Ctrl S';
+// The cheatsheet writes ⌘; on another system the same keys are Ctrl.
+if (!/Mac|iPhone|iPad/.test(navigator.platform)) document.querySelectorAll('.menu-cheat kbd').forEach(key => { key.textContent = key.textContent.replace('⌘', 'Ctrl '); });
+// The less used controls wait in the more menu: Focus, Spell check and Delete.
+const moreButton = document.querySelector('#more');
+const moreMenu = document.querySelector('#more-menu');
+function showMore(open, restoreFocus = false) {
+  moreMenu.hidden = !open;
+  moreButton.setAttribute('aria-expanded', String(open));
+  if (!open && restoreFocus) moreButton.focus();
+}
+moreButton.addEventListener('click', () => showMore(moreMenu.hidden));
+moreMenu.addEventListener('click', event => { if (event.target.closest('button')) showMore(false); });
+document.addEventListener('click', event => { if (!event.target.closest('.more')) showMore(false); });
+document.querySelector('.more').addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !moreMenu.hidden) { event.preventDefault(); event.stopPropagation(); showMore(false, true); }
+});
 const SIZE_KEY = 'noteSize';
 const sizeOptions = document.querySelector('#size-options');
 const sizeChoices = [...sizeOptions.querySelectorAll('[data-size]')];
@@ -1492,3 +1567,48 @@ async function heartbeat() {
 }
 setInterval(() => { heartbeat().catch(() => {}); }, HEARTBEAT_INTERVAL);
 loadEntries().catch(error => message(error.message, true));
+
+// On a phone the on-screen keyboard covers the bottom of the page, and the page does
+// not shrink to fit. Size the layout to what is visible, and give the editor the whole
+// screen while you type, so the line you are writing stays in view.
+(() => {
+  const viewport = window.visualViewport;
+  if (!viewport) return;
+  const fit = () => {
+    document.documentElement.style.setProperty('--vvh', viewport.height + 'px');
+    if (window.scrollY || viewport.offsetTop) window.scrollTo(0, 0);
+    if (document.activeElement === content) content.scrollIntoView({ block: 'nearest' });
+  };
+  viewport.addEventListener('resize', fit);
+  viewport.addEventListener('scroll', fit);
+  content.addEventListener('focus', () => { document.body.classList.add('typing'); setTimeout(fit, 250); });
+  content.addEventListener('blur', () => document.body.classList.remove('typing'));
+  // The caret can move without a key press, for example by a tap or a long press.
+  document.addEventListener('selectionchange', () => {
+    if (document.activeElement !== content || content.selectionStart !== content.selectionEnd) return;
+    const line = content.value.slice(0, content.selectionStart).split('\n').length;
+    const height = parseFloat(getComputedStyle(content).lineHeight) || 24;
+    const top = (line - 1) * height;
+    if (top < content.scrollTop) content.scrollTop = top;
+    else if (top + height > content.scrollTop + content.clientHeight - height) content.scrollTop = top + height - content.clientHeight + height;
+  });
+  fit();
+})();
+
+// The sidebar folds to a narrow rail with one button. The choice is remembered.
+const COLLAPSE_KEY = 'noteSidebarCollapsed';
+const collapseButton = document.querySelector('#collapse');
+function applyCollapsed(collapsed) {
+  document.body.classList.toggle('collapsed', collapsed);
+  collapseButton.textContent = collapsed ? '›' : '‹';
+  const label = collapsed ? 'Show the sidebar (⌘\\)' : 'Collapse the sidebar (⌘\\)';
+  collapseButton.title = label;
+  collapseButton.setAttribute('aria-label', label);
+  collapseButton.setAttribute('aria-expanded', String(!collapsed));
+  try { localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0'); } catch {}
+}
+collapseButton.addEventListener('click', () => applyCollapsed(!document.body.classList.contains('collapsed')));
+let startCollapsed = false;
+try { startCollapsed = localStorage.getItem(COLLAPSE_KEY) === '1'; } catch {}
+applyCollapsed(startCollapsed);
+refreshBin();

@@ -7,22 +7,30 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 
 ## Notes
 
+- The toolbar keeps the save status, the view buttons (**Edit**, **Split**, **Preview**), the unravel arrow and **Image** in the open. A note saves by itself, so there is no Save button; ⌘S saves at once, and ⌘B and ⌘I still make bold and italic. The **⋯** menu holds **Focus mode**, **Spell check**, a **Markdown cheatsheet** and **Delete**. Delete still asks first.
+- The box above the list searches titles and text. Each note shows when it was last edited. In **Edit** and **Preview** the text sits in a column of about 75 characters.
+
 - Markdown source on the left, live preview on the right.
 - Tab indents. An indented list line nests under the line above it, and an
   indented paragraph keeps its indent in the preview.
 - Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
 - ⌘L turns the current line into a task (`- [ ]`) or flips it between done
   and not done. Click a check box in the preview to flip it there.
-- Tick **Focus** to show only the Markdown, the preview and the timer. The
+- Open the **⋯** menu and tick **Focus mode** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
-- Tick **Compact** to show only the latest week of a note. Every earlier week
-  waits in the **Earlier weeks** dropdown above the preview, grouped by month,
-  with the days and open tasks of each week. Pick a week, or **All of** a month,
-  to read it there, and **Close** to put it away. A month needs no heading of
-  its own: it comes from the dates.
-  - The latest week is the week of the last day heading in the note, so the note
+- Notes with day headings open compact, every time. The last five days stay
+  open. Every earlier day waits in the **Earlier weeks** dropdown above the
+  preview, grouped by month, with the days and open tasks of each week. Pick a
+  week, or **All of** a month, to read it there, and **Close** to put it away. A
+  month needs no heading of its own: it comes from the dates.
+- The small arrow beside the view buttons unravels the whole note: every week and day
+  in the preview, and every line in the editor. Click it again to fold. It is not
+  remembered, so the next visit starts compact. The number of open days is
+  `DAYS_SHOWN` in `public/weeks.js`.
+  - The five days end on the last day heading in the note, so the note
     looks the same on any day. A heading starts with a date: `9/28`, `28/9`,
-    `01/10`, `9.28`, `9/28/2026` or `2026-10-01`. Each date is read against the
+    `01/10`, `9.28`, `9/28/2026`, `2026-10-01`, or a month in words such as
+    `3 oct 2026`, `10 oct`, `Oct 3` or `Mon 5th October`. Each date is read against the
     heading before it, so `01/10` after `9/30` is the 1st of October. Month first
     wins when both readings fit. A line in a fenced code block is not a heading.
   - **Still open** lists the tasks left open in earlier weeks, with the week each
@@ -34,10 +42,12 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
   - Compact expects the newest day at the bottom. A note with the newest day at
     the top is shown in full. A heading that starts with a fraction, such as
     `1/2 cup`, is read as a date.
-  - The source shows only the latest week. A bar above it says how many earlier
+  - The source shows only the open days. A bar above it says how many earlier
     lines are hidden, and **Show all** shows them. They stay in the note and in
     every save.
 - Double-click a title to rename. Deleted notes go to Trash.
+- The **Trash** is the wire-mesh bin at the foot of the sidebar. It shows paper when it holds a note. Click it to see the trashed notes, and click **Back** to return.
+- The **‹** button in the sidebar header folds the sidebar to a narrow rail, and **›** brings it back. ⌘\ (Ctrl+\) does the same. The choice is remembered.
 - A version check rejects a save that would overwrite someone else's edit.
 
 ## Images
@@ -79,7 +89,8 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - **Hide sidebar** removes the sidebar while you read and **Show sidebar**
   brings it back. The choice is remembered. On a narrow screen the sidebar
   starts hidden. Leaving the reader always shows the sidebar again.
-- Escape leaves the reader, then the library.
+- Escape leaves the reader, then the library. On a phone, **‹ Notes** at the top left of the Books and Files pages goes back to the notes.
+- pdf.js loads its main build in a recent browser. A browser that lacks the newest JavaScript features gets the legacy build from `public/vendor/legacy/` (pdf.js 6.3.289, 518,555 and 1,317,034 bytes). Add `?legacy` to the address, as in `https://obsidian.ibraim.ie/?legacy`, to use it on any browser.
 - The readers load only when a book opens, from `public/vendor/`, as plain
   files: `pdf.min.mjs` and `pdf.worker.min.mjs` (pdf.js 6.3.289, Apache-2.0),
   `epub.min.js` (epub.js 0.3.93, BSD-2-Clause) and `jszip.min.js` (JSZip 3.10.1,

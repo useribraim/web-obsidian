@@ -8,13 +8,34 @@
   // Safari refuses a canvas of more than about 16 million pixels.
   const MAX_CANVAS_PIXELS = 16_000_000;
 
+  // The main build of pdf.js needs very new browser features. A phone that lacks
+  // one of them gets the legacy build, which carries its own copies.
+  // Add ?legacy to the address to use the legacy build on any browser.
+  const modernBrowser = !/[?&]legacy\b/.test(location.search) && typeof Promise.withResolvers === 'function' &&
+    typeof Map.prototype.getOrInsertComputed === 'function' &&
+    typeof Math.sumPrecise === 'function' &&
+    typeof URL.parse === 'function' &&
+    typeof Uint8Array.fromBase64 === 'function' &&
+    typeof Uint8Array.prototype.toHex === 'function';
+  async function importBuild(folder) {
+    const lib = await import(folder + 'pdf.min.mjs');
+    lib.GlobalWorkerOptions.workerSrc = folder + 'pdf.worker.min.mjs';
+    return lib;
+  }
   let library = null;
   function loadPdfjs() {
     if (!library) {
-      library = import('/vendor/pdf.min.mjs').then(lib => {
-        lib.GlobalWorkerOptions.workerSrc = '/vendor/pdf.worker.min.mjs';
-        return lib;
-      }).catch(() => { library = null; throw new Error('Could not load the PDF reader.'); });
+      const builds = modernBrowser ? ['/vendor/'] : ['/vendor/legacy/', '/vendor/'];
+      library = (async () => {
+        let failure;
+        for (const folder of builds) {
+          try { return await importBuild(folder); } catch (error) { failure = error; }
+        }
+        throw failure;
+      })().catch(error => {
+        library = null;
+        throw new Error('Could not load the PDF reader: ' + (error?.message || error));
+      });
     }
     return library;
   }
@@ -50,7 +71,7 @@
       this.lib = await loadPdfjs();
       if (this.dead) return;
       this.loading = this.lib.getDocument({ url, disableAutoFetch: true, isEvalSupported: false });
-      this.doc = await this.loading.promise;
+      try { this.doc = await this.loading.promise; } catch (error) { throw new Error('Could not open this PDF: ' + (error?.message || error)); }
       if (this.dead) return;
       this.pageCount = this.doc.numPages;
       const first = await this.doc.getPage(1);
