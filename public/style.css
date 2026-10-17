@@ -309,8 +309,9 @@ body.focus .fold-note { padding-top: 8px; }
 .menu-item.danger:hover { background: #3b2828; }
 
 /* Reading width: a line of about 75 characters is easiest to read. */
-.editor[data-view="edit"] #content { max-width: 80ch; margin: 0 auto; }
-.editor[data-view="preview"] #preview { max-width: 74ch; margin: 0 auto; }
+/* An explicit width keeps auto margins from shrinking panes in the phone's column layout. */
+.editor[data-view="edit"] #content { width: 100%; max-width: 80ch; margin: 0 auto; }
+.editor[data-view="preview"] #preview { width: 100%; max-width: 74ch; margin: 0 auto; }
 #preview { line-height: 1.7; }
 #preview h3 { margin-top: 1.7em; }
 #preview > .earlier + h3, #preview > :first-child { margin-top: 0; }
