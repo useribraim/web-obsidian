@@ -27,20 +27,45 @@ function loginPage({ failed = false, next = '/' } = {}) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#191919">
+  <meta name="theme-color" content="#f0eee6">
+  <script>
+    try {
+      const theme = localStorage.getItem('noteTheme') === 'dark' ? 'dark' : 'light';
+      document.documentElement.dataset.theme = theme;
+      document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#191919' : '#f0eee6';
+    } catch {}
+  </script>
   <title>Notes — Sign in</title>
   <style>
-    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #d4d4d4; background: #1e1e1e; }
+    :root {
+      color-scheme: light;
+      --page: #faf9f5; --surface: #f0eee6; --input: #faf9f5;
+      --text: #292824; --muted: #6b685f; --border: #d4cfc3;
+      --accent: #a34f35; --button: #292824; --button-text: #faf9f5;
+      --button-hover: #46433c; --danger: #a1332b;
+      --heading-font: Georgia, "Times New Roman", serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text); background: var(--page);
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #1e1e1e; --surface: #191919; --input: #232323;
+      --text: #d4d4d4; --muted: #999; --border: #3a3a3a;
+      --accent: #a899ce; --button: #302a3b; --button-text: #c9bcdf;
+      --button-hover: #40354f; --danger: #e7a39c;
+      --heading-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
-    form { width: min(360px, calc(100% - 40px)); padding: 28px; background: #191919; border: 1px solid #292929; border-radius: 10px; }
-    h1 { margin: 0 0 22px; font-size: 18px; font-weight: 550; }
-    label { display: block; margin-bottom: 8px; color: #999; font-size: 13px; }
-    input { width: 100%; padding: 11px 12px; color: #d4d4d4; background: #232323; border: 1px solid #3a3a3a; border-radius: 5px; outline: none; }
-    input:focus { border-color: #a899ce; }
-    button { width: 100%; margin-top: 16px; padding: 10px 13px; color: #c9bcdf; background: #302a3b; border: 0; border-radius: 5px; cursor: pointer; }
-    button:hover { background: #40354f; }
-    #error { min-height: 18px; margin: 12px 0 0; color: #e7a39c; font-size: 12px; }
+    form { width: min(360px, calc(100% - 40px)); padding: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+    h1 { margin: 0 0 22px; font: 500 30px var(--heading-font); }
+    label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 13px; }
+    input { width: 100%; padding: 11px 12px; font: inherit; color: var(--text); background: var(--input); border: 1px solid var(--border); border-radius: 5px; outline: none; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+    button { width: 100%; margin-top: 16px; padding: 10px 13px; font: inherit; color: var(--button-text); background: var(--button); border: 0; border-radius: 5px; cursor: pointer; }
+    button:hover { background: var(--button-hover); }
+    button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    #error { min-height: 18px; margin: 12px 0 0; color: var(--danger); font-size: 12px; }
   </style>
 </head>
 <body>

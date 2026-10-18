@@ -12,6 +12,23 @@ const restoreButton = document.querySelector('#restore');
 const purgeButton = document.querySelector('#purge');
 const viewButtons = [...document.querySelectorAll('.view-option')];
 const spellcheck = document.querySelector('#spellcheck');
+const lightTheme = document.querySelector('#light-theme');
+const THEME_KEY = 'noteTheme';
+function applyTheme(theme) {
+  const dark = theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.querySelector('meta[name="theme-color"]').content = dark ? '#191919' : '#f0eee6';
+  lightTheme.checked = !dark;
+}
+applyTheme(document.documentElement.dataset.theme);
+lightTheme.addEventListener('change', () => {
+  const theme = lightTheme.checked ? 'light' : 'dark';
+  applyTheme(theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
+});
+window.addEventListener('storage', event => {
+  if (event.key === THEME_KEY || event.key === null) applyTheme(event.newValue);
+});
 const unravelButton = document.querySelector('#unravel');
 // Notes open compact: the last five days, and the rest behind a dropdown. The
 // quiet button beside the view buttons unravels the whole note. It is not

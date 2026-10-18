@@ -7,7 +7,9 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 
 ## Notes
 
-- The toolbar keeps the save status, the view buttons (**Edit**, **Split**, **Preview**), the unravel arrow and **Image** in the open. A note saves by itself, so there is no Save button; ⌘S saves at once, and ⌘B and ⌘I still make bold and italic. The **⋯** menu holds **Focus mode**, **Spell check**, a **Markdown cheatsheet** and **Delete**. Delete still asks first.
+- The app opens in a warm light theme, with cream surfaces, dark text and terracotta accents. Untick **Light theme** in the **⋯** menu to use dark mode. The choice is remembered on this browser, including the sign-in page. The book reader keeps its own **Dark** / **Light** choice.
+
+- The toolbar keeps the save status, the view buttons (**Edit**, **Split**, **Preview**), the unravel arrow and **Image** in the open. A note saves by itself, so there is no Save button; ⌘S saves at once, and ⌘B and ⌘I still make bold and italic. The **⋯** menu holds **Focus mode**, **Light theme**, **Spell check**, a **Markdown cheatsheet** and **Delete**. Delete still asks first.
 - The box above the list searches titles and text. Each note shows when it was last edited. In **Edit** and **Preview** the text sits in a column of about 75 characters.
 
 - Markdown source on the left, live preview on the right.

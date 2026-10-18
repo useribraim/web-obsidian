@@ -3,7 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#191919">
+  <meta name="theme-color" content="#f0eee6">
+  <script>
+    // Apply the remembered theme before the stylesheet to avoid a flash.
+    try {
+      const theme = localStorage.getItem('noteTheme') === 'dark' ? 'dark' : 'light';
+      document.documentElement.dataset.theme = theme;
+      document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#191919' : '#f0eee6';
+    } catch {}
+  </script>
   <title>Notes</title>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="icon" href="/favicon-16.png" type="image/png" sizes="16x16" media="(prefers-color-scheme: light)">
@@ -104,6 +112,7 @@
         <button id="more" class="tool" type="button" aria-label="More actions" aria-haspopup="true" aria-expanded="false" aria-controls="more-menu" title="More">⋯</button>
         <div id="more-menu" class="menu" role="group" aria-label="More actions" hidden>
           <label class="menu-item focus-item" title="Show only the note, its preview, and the timer"><input type="checkbox" id="focus-mode"> Focus mode</label>
+          <label class="menu-item" title="Use warm cream surfaces and dark text"><input type="checkbox" id="light-theme" checked> Light theme</label>
           <label class="menu-item" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label>
           <details class="menu-cheat">
             <summary class="menu-item">Markdown cheatsheet</summary>
