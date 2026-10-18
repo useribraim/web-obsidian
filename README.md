@@ -18,6 +18,11 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
 - ⌘L turns the current line into a task (`- [ ]`) or flips it between done
   and not done. Click a check box in the preview to flip it there.
+- Primary tasks use `- [ ] task`. For a secondary task, write `- [ ] > subtask`
+  or indent a task with a tab or two spaces. Secondary tasks have smaller,
+  indented checkboxes; the `>` stays in the source and is hidden in the preview.
+  Each checkbox changes only its own task. A completed parent does not cross out
+  unfinished subtasks. Click a task's text or its checkbox to tick it.
 - Open the **⋯** menu and tick **Focus mode** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
 - Notes with day headings open compact, every time. The last five days stay

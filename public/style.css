@@ -154,9 +154,14 @@ input, textarea { color: var(--text); background: transparent; border: 0; outlin
 #preview li > ul, #preview li > ol { margin: .2em 0 0; }
 #preview li { margin: .2em 0; }
 #preview li.task { list-style: none; margin-left: -1.5em; }
-#preview li.task input { width: 1em; height: 1em; margin: 0 .5em 0 0; vertical-align: -.1em; accent-color: var(--accent); cursor: pointer; }
+#preview li.task-secondary { margin-left: 0; }
+#preview .task-label { display: inline-flex; align-items: baseline; gap: .55em; max-width: 100%; cursor: pointer; }
+#preview .task-text { min-width: 0; overflow-wrap: anywhere; }
+#preview li.task-primary > .task-label > .task-text { font-weight: 500; }
+#preview li.task input { flex: none; width: 1.05em; height: 1.05em; margin: 0; accent-color: var(--accent); cursor: pointer; }
+#preview li.task-secondary > .task-label > input { width: .85em; height: .85em; }
 #preview li.task input:disabled { cursor: default; }
-#preview li.task.done { color: var(--subtle); text-decoration: line-through; }
+#preview li.task.done > .task-label > .task-text { color: var(--subtle); text-decoration: line-through; }
 #preview blockquote { margin: 0 0 .75em; padding: .1em 1em; border-left: 3px solid var(--accent-border); color: var(--accent-text); }
 #preview pre { margin: 0 0 .8em; padding: 10px 13px; background: var(--code-bg); border: 1px solid var(--code-chip); border-radius: 6px; overflow: auto; }
 #preview code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }

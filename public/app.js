@@ -118,14 +118,23 @@ function renderInline(text) {
 // document order so a click in the preview can find its source line.
 const TASK = /^(\s*(?:[-*+]|\d+[.)])\s+)\[([ xX])\](\s+.*|)$/;
 let taskCount = 0;
-function renderItem(item) {
+function renderItem(item, nested = false) {
   const task = /^\[([ xX])\](?:\s+(.*)|)$/.exec(item);
   if (!task) return '<li>' + renderInline(item);
   const done = task[1] !== ' ';
   const index = taskCount;
   taskCount += 1;
-  return '<li class="task' + (done ? ' done' : '') + '"><input type="checkbox" data-task="' + index + '"' +
-    (done ? ' checked' : '') + (content.disabled ? ' disabled' : '') + '> ' + renderInline(task[2] || '');
+  const text = task[2] || '';
+  // The > shorthand also works when a paragraph separates a subtask from its
+  // parent. Indented Markdown tasks use the same secondary appearance.
+  const secondaryMarker = /^>(?:\s+(.*)|$)/.exec(text);
+  const secondary = nested || Boolean(secondaryMarker);
+  const label = secondaryMarker ? secondaryMarker[1] || '' : text;
+  return '<li class="task task-' + (secondary ? 'secondary' : 'primary') + (done ? ' done' : '') + '">' +
+    '<label class="task-label"><input type="checkbox" data-task="' + index + '"' +
+    (label ? '' : ' aria-label="' + (secondary ? 'Subtask' : 'Task') + '"') +
+    (done ? ' checked' : '') + (content.disabled ? ' disabled' : '') + '>' +
+    '<span class="task-text">' + renderInline(label) + '</span></label>';
 }
 // A run of list lines. Deeper indentation (a tab, or two spaces) opens a
 // nested list inside the item above it.
@@ -142,7 +151,7 @@ function renderList(lines) {
       html += '<' + tag + '>';
       open.push({ depth, tag });
     } else html += '</li>';
-    html += renderItem(parts[3]);
+    html += renderItem(parts[3], depth > 0);
   }
   while (open.length) html += '</li></' + open.pop().tag + '>';
   return html;
