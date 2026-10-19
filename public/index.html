@@ -7,9 +7,11 @@
   <script>
     // Apply the remembered theme before the stylesheet to avoid a flash.
     try {
-      const theme = localStorage.getItem('noteTheme') === 'dark' ? 'dark' : 'light';
+      const colors = { light: '#f0eee6', dark: '#191919', forest: '#141e18', nord: '#272c36' };
+      const saved = localStorage.getItem('noteTheme');
+      const theme = Object.hasOwn(colors, saved) ? saved : 'light';
       document.documentElement.dataset.theme = theme;
-      document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#191919' : '#f0eee6';
+      document.querySelector('meta[name="theme-color"]').content = colors[theme];
     } catch {}
   </script>
   <title>Notes</title>
@@ -24,6 +26,7 @@
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/mobile.css">
   <link rel="stylesheet" href="/roadmap.css">
+  <link rel="stylesheet" href="/themes.css">
   <script src="/weeks.js" defer></script>
   <script src="/app.js" defer></script>
   <script src="/pdf-view.js" defer></script>
@@ -141,7 +144,7 @@
         <div id="more-menu" class="menu" role="group" aria-label="More actions" hidden>
           <button id="mobile-rename" class="menu-item" type="button">Rename note</button>
           <label class="menu-item focus-item" title="Show only the note, its preview, and the timer"><input type="checkbox" id="focus-mode"> Focus mode</label>
-          <label class="menu-item" title="Use warm cream surfaces and dark text"><input type="checkbox" id="light-theme" checked> Light theme</label>
+          <label class="menu-item theme-item" for="theme">Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option><option value="forest">Forest</option><option value="nord">Nord</option></select></label>
           <label class="menu-item" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label>
           <details class="menu-cheat">
             <summary class="menu-item">Markdown cheatsheet</summary>

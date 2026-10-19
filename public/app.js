@@ -12,17 +12,18 @@ const restoreButton = document.querySelector('#restore');
 const purgeButton = document.querySelector('#purge');
 const viewButtons = [...document.querySelectorAll('.view-option')];
 const spellcheck = document.querySelector('#spellcheck');
-const lightTheme = document.querySelector('#light-theme');
+const themePicker = document.querySelector('#theme');
 const THEME_KEY = 'noteTheme';
 function applyTheme(theme) {
-  const dark = theme === 'dark';
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  document.querySelector('meta[name="theme-color"]').content = dark ? '#191919' : '#f0eee6';
-  lightTheme.checked = !dark;
+  const colors = { light: '#f0eee6', dark: '#191919', forest: '#141e18', nord: '#272c36' };
+  const selected = Object.hasOwn(colors, theme) ? theme : 'light';
+  document.documentElement.dataset.theme = selected;
+  document.querySelector('meta[name="theme-color"]').content = colors[selected];
+  themePicker.value = selected;
 }
 applyTheme(document.documentElement.dataset.theme);
-lightTheme.addEventListener('change', () => {
-  const theme = lightTheme.checked ? 'light' : 'dark';
+themePicker.addEventListener('change', () => {
+  const theme = themePicker.value;
   applyTheme(theme);
   try { localStorage.setItem(THEME_KEY, theme); } catch {}
 });
