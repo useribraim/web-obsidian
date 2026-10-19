@@ -1,3 +1,6 @@
+/* A reminder lives outside the editor's scroll area, so it remains in view. */
+.pinned-note { flex: none; width: calc(100% - 40px); max-width: 1036px; margin: 8px auto 12px; padding: 12px 16px; border: 1px solid var(--accent-border); border-left: 3px solid var(--accent); border-radius: 7px; background: var(--accent-soft); color: var(--accent-text); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 25dvh; overflow: auto; }
+main:not([data-page="notes"]) > .pinned-note { display: none; }
 /* Complete semantic palettes shared by notes, navigation, and the roadmap. */
 :root:is([data-theme="forest"], [data-theme="nord"]) {
   color-scheme: dark;

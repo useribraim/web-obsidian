@@ -214,7 +214,33 @@ function renderMarkdown(source) {
   }
   return html;
 }
+// The first explicit pinned callout stays outside both scrolling panes.
+// Code examples containing the syntax must not become real reminders.
+function pinnedReminder(source) {
+  const lines = source.replace(/\r\n?/g, '\n').split('\n');
+  let fence = null;
+  for (let i = 0; i < lines.length; i += 1) {
+    const marker = /^\s*(`{3,}|~{3,})/.exec(lines[i]);
+    if (fence) {
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(lines[i].slice(marker[0].length))) fence = null;
+      continue;
+    }
+    if (marker) { fence = marker[1]; continue; }
+    const pin = /^\s{0,3}>\s*\[!pin\]\s*(.*)$/i.exec(lines[i]);
+    if (!pin) continue;
+    const text = [pin[1]];
+    while (i + 1 < lines.length && /^\s{0,3}>/.test(lines[i + 1])) {
+      text.push(lines[++i].replace(/^\s{0,3}>\s?/, ''));
+    }
+    return text.join('\n').trim();
+  }
+  return '';
+}
 function renderPreview() {
+  const reminder = pinnedReminder(noteText());
+  const banner = document.querySelector('#pinned-note');
+  banner.hidden = !reminder;
+  if (banner.textContent !== reminder) banner.textContent = reminder;
   if (editor.dataset.view === 'edit') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());
