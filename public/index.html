@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <meta name="theme-color" content="#f0eee6">
   <script>
     // Apply the remembered theme before the stylesheet to avoid a flash.
@@ -22,17 +22,28 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="mask-icon" href="/mask-icon.svg" color="#202020">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/mobile.css">
+  <link rel="stylesheet" href="/roadmap.css">
   <script src="/weeks.js" defer></script>
   <script src="/app.js" defer></script>
   <script src="/pdf-view.js" defer></script>
   <script src="/books.js" defer></script>
   <script src="/files.js" defer></script>
+  <script src="/mobile.js" defer></script>
+  <script src="/roadmap.js" type="module"></script>
 </head>
 <body>
-  <aside>
-    <header><span class="brand"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button><button id="collapse" class="rail-toggle" type="button" aria-label="Collapse the sidebar (⌘\)" aria-expanded="true" title="Collapse the sidebar (⌘\)">‹</button></span></header>
+  <div class="mobile-header">
+    <button id="mobile-nav" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <span id="mobile-title">Notes</span>
+    <button id="mobile-timer" type="button" aria-label="Open running timer" hidden></button>
+  </div>
+  <div id="nav-backdrop" hidden></div>
+  <aside id="sidebar" aria-label="Navigation">
+    <header><span class="brand" id="sidebar-title"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button><button id="collapse" class="rail-toggle" type="button" aria-label="Collapse the sidebar (⌘\)" aria-expanded="true" title="Collapse the sidebar (⌘\)">‹</button><button id="mobile-nav-close" type="button" aria-label="Close navigation">×</button></span></header>
     <a id="books-open" class="books-link" href="#/books" title="Open your books">Books</a>
     <a id="files-open" class="books-link" href="#/files" title="Send a file to your other devices">Files</a>
+    <a id="roadmap-open" class="books-link" href="#/roadmap" title="Your LeetCode study roadmap">Roadmap</a>
     <input id="search" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off" maxlength="100">
     <nav id="notes" aria-label="Notes"></nav>
     <section class="timer" aria-label="Time tracker">
@@ -60,7 +71,24 @@
         <span class="bin-label">Trash</span>
       </button><div class="size-picker"><button id="size" type="button" aria-label="Text size: 14 pixels" aria-expanded="false" aria-controls="size-options">14 px ▾</button><div id="size-options" role="group" aria-label="Text size" hidden><button type="button" data-size="8">8 px</button><button type="button" data-size="10">10 px</button><button type="button" data-size="12">12 px</button><button type="button" data-size="14">14 px</button><button type="button" data-size="16">16 px</button><button type="button" data-size="18">18 px</button><button type="button" data-size="20">20 px</button><button type="button" data-size="24">24 px</button></div></div></footer>
   </aside>
-  <main data-page="notes">
+  <main id="app-main" data-page="notes">
+    <section id="roadmap-view" class="roadmap" aria-label="LeetCode 150 roadmap">
+      <div class="roadmap-content">
+        <div class="roadmap-heading"><button id="roadmap-close" class="tool" type="button">‹ Notes</button><span id="roadmap-status" role="status">Loading progress…</span><button id="roadmap-retry" class="tool" type="button" hidden>Retry</button></div>
+        <div class="roadmap-intro"><span class="roadmap-eyebrow">YOUR STUDY PATH</span><h1>LeetCode 150</h1><p>Ten stages. One problem at a time.</p></div>
+        <div class="roadmap-overview">
+          <div><strong id="roadmap-count">0 / 150</strong><span>problems completed</span></div>
+          <button id="roadmap-continue" class="tool" type="button" disabled>Continue →</button>
+          <progress id="roadmap-progress" max="150" value="0" aria-label="Overall roadmap progress"></progress>
+          <p id="roadmap-next">Your progress is saved to this private site, across devices.</p>
+        </div>
+        <p class="roadmap-guidance">Follow the path, not a deadline. Start with Easy and Medium; revisit Hards later. Tick a problem when you can solve it independently and explain its complexity. This tracks your practice here, not your LeetCode account.</p>
+        <div class="roadmap-controls"><input id="roadmap-search" type="search" placeholder="Find a problem or topic…" aria-label="Find a roadmap problem or topic" maxlength="150"><select id="roadmap-filter" aria-label="Filter roadmap problems"><option value="all">All problems</option><option value="remaining">Remaining</option><option value="completed">Completed</option></select></div>
+        <p id="roadmap-empty" hidden>No problems match your filters.</p>
+        <div id="roadmap-stages" class="roadmap-stages" aria-busy="true"></div>
+        <div class="roadmap-finish"><span class="roadmap-eyebrow">THE FINISH LINE</span><h2>Mixed, timed interviews</h2><p>No topic labels. Explain your approach aloud, implement it, test edge cases, and state time and space complexity.</p><p>Practice loop: attempt → hint if needed → implement from memory → revisit tomorrow, in a week, and in a month.</p><a href="https://leetcode.com/studyplan/top-interview-150/" target="_blank" rel="noopener noreferrer">The official Top Interview 150 ↗</a></div>
+      </div>
+    </section>
     <section id="report-view" class="report" hidden aria-label="Time report">
       <div class="report-head"><h2>Time report</h2><button id="close-report" class="tool">Back to notes</button></div>
       <div class="totals">
@@ -111,6 +139,7 @@
       <div class="more">
         <button id="more" class="tool" type="button" aria-label="More actions" aria-haspopup="true" aria-expanded="false" aria-controls="more-menu" title="More">⋯</button>
         <div id="more-menu" class="menu" role="group" aria-label="More actions" hidden>
+          <button id="mobile-rename" class="menu-item" type="button">Rename note</button>
           <label class="menu-item focus-item" title="Show only the note, its preview, and the timer"><input type="checkbox" id="focus-mode"> Focus mode</label>
           <label class="menu-item" title="Use warm cream surfaces and dark text"><input type="checkbox" id="light-theme" checked> Light theme</label>
           <label class="menu-item" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label>

@@ -1,0 +1,92 @@
+/* Mobile is a note workspace, not a stacked desktop sidebar. */
+.mobile-header, #mobile-nav-close, #mobile-rename { display: none; }
+
+@media (max-width: 600px) {
+  :root { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { flex-direction: column; overflow: hidden; width: 100%; }
+  .mobile-header {
+    display: flex; align-items: center; gap: 8px; flex: none;
+    min-height: 56px; padding: env(safe-area-inset-top, 0px) 12px 0;
+    border-bottom: 1px solid #2b2b2b; background: #191919;
+  }
+  .mobile-header button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; flex: none; }
+  #mobile-nav { color: #aaa; }
+  #mobile-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 16px; font-weight: 550; }
+  #mobile-timer { font-size: 12px; font-variant-numeric: tabular-nums; color: #c9bcdf; padding: 0 6px; }
+  .mobile-header .more { flex: none; }
+  .mobile-header #more { border: 0; background: transparent; font-size: 20px; padding: 0; }
+  #more-menu { position: absolute; right: 0; top: calc(100% + 4px); width: min(300px, calc(100vw - 24px)); min-width: 0; max-height: calc(var(--vvh, 100dvh) - 76px); overflow: auto; }
+  #more-menu > * { display: flex; }
+  #more-menu > .menu-cheat { display: block; }
+  #more-menu .menu-item, #more-menu > #add-image, #more-menu > #unravel { min-height: 44px; padding: 11px 12px; font-size: 14px; }
+  #more-menu > #add-image, #more-menu > #unravel { width: 100%; justify-content: flex-start; text-align: left; border: 0; border-radius: 5px; color: #d0d0d0; background: transparent; }
+  #more-menu > #unravel { font-size: 0; }
+  #more-menu > #unravel::after { content: attr(data-mobile-label); font-size: 14px; }
+
+  /* The drawer is out of the layout and out of the tab order when closed.
+     IDs intentionally isolate it from desktop Focus / collapsed preferences. */
+  #sidebar { display: none; }
+  body.mobile-nav-open #sidebar {
+    display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+    position: fixed; z-index: 40; inset: 0 auto auto 0;
+    width: min(360px, calc(100% - 32px)); height: var(--vvh, 100dvh); max-height: none;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+    border: 0; border-right: 1px solid #333; overflow: auto; transition: none;
+    background: #191919; box-shadow: 12px 0 48px #0005;
+  }
+  #nav-backdrop { position: fixed; z-index: 39; inset: 0; background: #0009; }
+  #sidebar > header { display: flex; flex: none; justify-content: space-between; padding: 0 0 12px; }
+  #sidebar > header > .brand { display: flex; font-size: 16px; }
+  #sidebar > header > .head-actions { display: flex; }
+  #sidebar .head-actions > * { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+  #sidebar #collapse { display: none; }
+  #sidebar #new, #mobile-nav-close { width: 40px; font-size: 26px; font-weight: 300; }
+  #sidebar #logout { font-size: 12px; padding: 6px; }
+  #sidebar > .books-link { display: block; flex: none; width: 100%; padding: 12px; margin: 0; font-size: 14px; }
+  #sidebar #search { display: block; flex: none; width: 100%; margin: 0; min-height: 44px; font-size: 16px; }
+  #sidebar > nav { display: block; flex: 1 1 auto; min-height: 96px; overflow: auto; }
+  #sidebar .note { width: 100%; max-width: none; min-height: 48px; margin: 0 0 4px; padding: 10px 12px; font-size: 14px; }
+  #sidebar .note-date { display: block; }
+  #sidebar .rename { width: 100%; min-height: 48px; margin: 0; font-size: 16px; }
+  #sidebar > .timer { display: flex; flex: none; flex-direction: column; align-items: stretch; gap: 8px; width: 100%; max-width: none; margin: 0; padding: 16px 0 0; border-top: 1px solid #292929; }
+  #sidebar #task { flex: none; width: 100%; min-height: 44px; font-size: 16px; }
+  #sidebar .timer-row { justify-content: space-between; }
+  #sidebar #clock { font-size: 18px; }
+  #sidebar #toggle-timer { min-height: 44px; }
+  #sidebar .timer-summary { display: flex; width: 100%; min-height: 44px; }
+  #sidebar > footer { display: flex; flex: none; min-height: 48px; padding: 8px 0 0; border-top: 1px solid #292929; }
+  #sidebar #size { min-height: 44px; font-size: 13px; }
+  #sidebar #size-options { top: auto; bottom: calc(100% + 8px); }
+  #sidebar #size-options button { min-height: 44px; }
+
+  #app-main { min-height: 0; width: 100%; }
+  #app-main > .toolbar { flex: none; flex-wrap: nowrap; gap: 8px; width: 100%; max-width: none; min-height: 52px; margin: 0; padding: 4px 16px; }
+  #app-main > .toolbar > .views { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: #171717; }
+  #app-main .view-option { min-height: 36px; padding: 8px 16px; border: 0; background: transparent; border-radius: 6px; font-size: 13px; color: #999; }
+  #app-main .view-option.active { background: #35303e; color: #ddd1ed; }
+  #app-main .view-option[data-view="split"] { display: none; }
+  #app-main #status { display: block; order: 2; min-width: 0; margin: 0 0 0 auto; font-size: 11px; text-align: right; overflow-wrap: anywhere; }
+  #app-main #format-group { display: none; }
+  #app-main #restore { display: inline-flex; min-height: 44px; }
+  #app-main > .fold-note { flex: none; flex-wrap: nowrap; gap: 8px; max-width: none; min-height: 32px; padding: 0 20px 4px; font-size: 11px; }
+  #fold-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #fold-toggle { flex: none; min-height: 32px; font-size: 11px; }
+  #app-main > #editor { flex: 1 1 0; flex-direction: column; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 12px 20px 0; }
+  #editor > #content, #editor > #preview { width: 100%; max-width: none; margin: 0; padding: 0 0 max(32px, env(safe-area-inset-bottom, 0px)); border: 0; font-size: var(--note-size); line-height: 1.7; }
+  #editor > #preview { overflow-wrap: anywhere; }
+  #app-main[data-page="notes"] { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  :root[data-theme="light"] .mobile-header,
+  :root[data-theme="light"] #sidebar { background: var(--sidebar); border-color: var(--border); }
+  :root[data-theme="light"] #mobile-nav,
+  :root[data-theme="light"] #sidebar #logout,
+  :root[data-theme="light"] #app-main #status { color: var(--muted); }
+  :root[data-theme="light"] #mobile-timer { color: var(--accent-text); }
+  :root[data-theme="light"] #more-menu > #add-image,
+  :root[data-theme="light"] #more-menu > #unravel { color: var(--text); }
+  :root[data-theme="light"] #sidebar > .timer,
+  :root[data-theme="light"] #sidebar > footer { border-color: var(--border); }
+  :root[data-theme="light"] #app-main > .toolbar > .views { background: var(--code-bg); }
+  :root[data-theme="light"] #app-main .view-option { color: var(--muted); }
+  :root[data-theme="light"] #app-main .view-option.active { background: var(--accent-soft); color: var(--accent-text); }
+  :root[data-theme="light"] #app-main #status.error { color: var(--danger); }
+}

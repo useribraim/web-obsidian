@@ -44,6 +44,13 @@ jobs:
           wranglerVersion: "4"
           command: d1 execute ibraim-obsidian-notes --remote --file migrations/0006_add_files.sql
 
+      - name: Apply the roadmap migration
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4"
+          command: d1 execute ibraim-obsidian-notes --remote --file migrations/0007_add_roadmap.sql
+
       - name: Deploy the Worker
         uses: cloudflare/wrangler-action@v3
         with:

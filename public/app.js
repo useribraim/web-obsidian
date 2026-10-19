@@ -56,7 +56,8 @@ let savingPromise = null;
 let blockedMessage = '';
 let renaming = false;
 let lastClick = { id: null, time: 0 };
-let view = window.matchMedia('(max-width: 600px)').matches ? 'edit' : 'split';
+const phoneLayout = window.matchMedia('(max-width: 600px)');
+let view = phoneLayout.matches ? 'edit' : 'split';
 
 logout.onclick = async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
@@ -567,11 +568,13 @@ function updateControls() {
   purgeButton.disabled = busy;
   newButton.hidden = mode === 'trash';
   newButton.disabled = busy;
+  document.querySelector('#mobile-rename').disabled = busy || !current || mode !== 'active';
   const readOnly = mode === 'trash' || trashed;
   imageButton.hidden = readOnly;
   imageButton.disabled = busy;
   trashLabel.textContent = mode === 'trash' ? 'Back' : 'Trash';
   trashButton.title = mode === 'trash' ? 'Back to notes' : 'Trash';
+  trashButton.setAttribute('aria-label', trashButton.title);
 }
 // The last-edited date under each title: a time today, "Yesterday", or the day.
 function noteDate(iso) {
@@ -614,6 +617,7 @@ async function refreshBin() {
   } catch {}
 }
 function render() {
+  document.querySelector('main').dataset.noteTitle = current?.title || (mode === 'trash' ? 'Trash' : 'New note');
   if (renaming) return;
   list.replaceChildren();
   const shown = mode === 'active' && searchQuery ? searchResults : notes;
@@ -678,6 +682,14 @@ async function startRename(id) {
     else if (event.key === 'Escape') { event.preventDefault(); finish(false); }
   };
 }
+document.querySelector('#mobile-rename').addEventListener('click', () => {
+  if (busy || !current || mode !== 'active') return;
+  searchBox.value = '';
+  searchQuery = '';
+  render();
+  window.mobileNavigation?.open();
+  startRename(current.id);
+});
 async function renameNote(id, newTitle) {
   try {
     const note = await api('/' + id);
@@ -722,6 +734,7 @@ function show(note) {
   blockedMessage = '';
   updateControls();
   render();
+  document.dispatchEvent(new Event('note-shown'));
 }
 function schedule() {
   clearTimeout(timer);
@@ -805,6 +818,8 @@ newButton.onclick = async () => {
   if (!(await flush())) return;
   resetDraft();
   message('New note');
+  if (phoneLayout.matches) { view = 'edit'; applyView(); }
+  window.mobileNavigation?.close(false);
   content.focus();
 };
 trashButton.onclick = async () => {
@@ -941,9 +956,13 @@ try {
   if (saved && ['edit', 'split', 'preview'].includes(saved)) view = saved;
 } catch {}
 function applyView() {
-  editor.dataset.view = view;
-  for (const button of viewButtons) button.classList.toggle('active', button.dataset.view === view);
-  if (view !== 'edit') renderPreview();
+  const shown = phoneLayout.matches && view === 'split' ? 'edit' : view;
+  editor.dataset.view = shown;
+  for (const button of viewButtons) {
+    button.classList.toggle('active', button.dataset.view === shown);
+    button.setAttribute('aria-pressed', String(button.dataset.view === shown));
+  }
+  if (shown !== 'edit') renderPreview();
 }
 for (const button of viewButtons) {
   button.onclick = () => {
@@ -960,7 +979,7 @@ const focusMode = document.querySelector('#focus-mode');
 try { focusMode.checked = localStorage.getItem(FOCUS_KEY) === '1'; } catch {}
 function applyFocus() {
   document.body.classList.toggle('focus', focusMode.checked);
-  if (focusMode.checked) {
+  if (focusMode.checked && !phoneLayout.matches) {
     editor.dataset.view = 'split';
     renderPreview();
   } else {
@@ -973,6 +992,7 @@ focusMode.addEventListener('change', () => {
   try { localStorage.setItem(FOCUS_KEY, focusMode.checked ? '1' : '0'); } catch {}
 });
 applyFocus();
+phoneLayout.addEventListener('change', applyFocus);
 // Split or join the source again, keeping the caret on the same text.
 function resplitSource() {
   const folded = foldedSource.length;
@@ -988,6 +1008,7 @@ function resplitSource() {
   renderPreview();
 }
 function showUnraveled() {
+  unravelButton.dataset.mobileLabel = unraveled ? 'Fold earlier days' : 'Show whole note';
   unravelButton.setAttribute('aria-pressed', String(unraveled));
   unravelButton.textContent = unraveled ? '⤡' : '⤢';
   unravelButton.title = unraveled ? 'Fold the earlier weeks again' : 'Unravel: show every week and day';
@@ -1054,9 +1075,11 @@ document.querySelector('.more').addEventListener('keydown', event => {
   if (event.key === 'Escape' && !moreMenu.hidden) { event.preventDefault(); event.stopPropagation(); showMore(false, true); }
 });
 const SIZE_KEY = 'noteSize';
+const MOBILE_SIZE_KEY = 'noteMobileSize';
+const sizeKey = () => phoneLayout.matches ? MOBILE_SIZE_KEY : SIZE_KEY;
 const sizeOptions = document.querySelector('#size-options');
 const sizeChoices = [...sizeOptions.querySelectorAll('[data-size]')];
-let noteSize = '14';
+let noteSize = phoneLayout.matches ? '16' : '14';
 function applySize() {
   document.documentElement.style.setProperty('--note-size', noteSize + 'px');
   size.textContent = noteSize + ' px ▾';
@@ -1069,18 +1092,23 @@ function showSizeOptions(open, restoreFocus = false) {
   if (open) sizeChoices.find(choice => choice.dataset.size === noteSize).focus();
   else if (restoreFocus) size.focus();
 }
-try {
-  const saved = localStorage.getItem(SIZE_KEY);
-  if (sizeChoices.some(choice => choice.dataset.size === saved)) noteSize = saved;
-} catch {}
-applySize();
+function loadSize() {
+  noteSize = phoneLayout.matches ? '16' : '14';
+  try {
+    const saved = localStorage.getItem(sizeKey());
+    if (sizeChoices.some(choice => choice.dataset.size === saved)) noteSize = saved;
+  } catch {}
+  applySize();
+}
+loadSize();
+phoneLayout.addEventListener('change', loadSize);
 renderPreview();
 size.onclick = () => showSizeOptions(sizeOptions.hidden);
 for (const choice of sizeChoices) {
   choice.onclick = () => {
     noteSize = choice.dataset.size;
     applySize();
-    try { localStorage.setItem(SIZE_KEY, noteSize); } catch {}
+    try { localStorage.setItem(sizeKey(), noteSize); } catch {}
     showSizeOptions(false, true);
   };
 }
@@ -1110,7 +1138,7 @@ async function init() {
   } catch (error) { setBusy(false); message(error.message, true); }
 }
 // Books read the address after the first note has loaded, so that a link to a book is not undone.
-init().then(() => window.routeBooks?.());
+init().then(() => { window.notesReady = true; window.routeBooks?.(); });
 
 // Images live separately from note text. Insert links only after upload succeeds.
 const MAX_IMAGE_BYTES = 1_500_000;
@@ -1560,6 +1588,7 @@ function renderReport() {
   }
 }
 function showReport(open) {
+  window.closeRoadmap?.();
   window.closeBooks?.();
   window.closeFiles?.();
   main.dataset.page = open ? 'report' : 'notes';
@@ -1594,29 +1623,19 @@ async function heartbeat() {
 setInterval(() => { heartbeat().catch(() => {}); }, HEARTBEAT_INTERVAL);
 loadEntries().catch(error => message(error.message, true));
 
-// On a phone the on-screen keyboard covers the bottom of the page, and the page does
-// not shrink to fit. Size the layout to what is visible, and give the editor the whole
-// screen while you type, so the line you are writing stays in view.
+// Let the textarea manage its own caret and scrolling. Only size the workspace
+// to the visible viewport; scrolling the document fights Android's keyboard.
 (() => {
   const viewport = window.visualViewport;
   if (!viewport) return;
   const fit = () => {
+    if (!phoneLayout.matches || viewport.scale !== 1) return;
     document.documentElement.style.setProperty('--vvh', viewport.height + 'px');
-    if (window.scrollY || viewport.offsetTop) window.scrollTo(0, 0);
-    if (document.activeElement === content) content.scrollIntoView({ block: 'nearest' });
   };
   viewport.addEventListener('resize', fit);
-  viewport.addEventListener('scroll', fit);
-  content.addEventListener('focus', () => { document.body.classList.add('typing'); setTimeout(fit, 250); });
-  content.addEventListener('blur', () => document.body.classList.remove('typing'));
-  // The caret can move without a key press, for example by a tap or a long press.
-  document.addEventListener('selectionchange', () => {
-    if (document.activeElement !== content || content.selectionStart !== content.selectionEnd) return;
-    const line = content.value.slice(0, content.selectionStart).split('\n').length;
-    const height = parseFloat(getComputedStyle(content).lineHeight) || 24;
-    const top = (line - 1) * height;
-    if (top < content.scrollTop) content.scrollTop = top;
-    else if (top + height > content.scrollTop + content.clientHeight - height) content.scrollTop = top + height - content.clientHeight + height;
+  phoneLayout.addEventListener('change', () => {
+    document.documentElement.style.removeProperty('--vvh');
+    fit();
   });
   fit();
 })();

@@ -57,6 +57,16 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - The **‹** button in the sidebar header folds the sidebar to a narrow rail, and **›** brings it back. ⌘\ (Ctrl+\) does the same. The choice is remembered.
 - A version check rejects a save that would overwrite someone else's edit.
 
+## Roadmap
+
+- **Roadmap** in the sidebar (or mobile navigation drawer) opens `#/roadmap`, a dedicated LeetCode Top Interview 150 study path, separate from note content.
+- Ten connected stages include all 150 problems, difficulty labels, direct LeetCode links, and a learning checkpoint for each stage. Expand a stage to work through its checklist.
+- Checkboxes and overall / stage counts persist in D1, shared across devices signed into this private site. Progress is tracked here; it is not linked to a LeetCode account.
+- **Continue** finds the next unfinished Easy or Medium problem before suggesting remaining Hards. Search and All / Remaining / Completed filters help find problems.
+- Each checkbox saves independently. Failed saves are rolled back with a visible error; the page refreshes progress on return, reconnection, and every 30 seconds while visible.
+- Existing databases need `migrations/0007_add_roadmap.sql`. The deploy workflow applies it automatically; `schema.sql` includes it for fresh local databases.
+- Run the data, migration, authentication, and persistence tests with `node --test test/roadmap.test.mjs` (requires Node with `node:sqlite`). Browser scenarios live in `test/roadmap.browser.mjs` and intercept requests rather than touching real notes or progress.
+
 ## Images
 
 - Click **Image**, paste a screenshot, or drop images into the editor or preview.

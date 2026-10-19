@@ -1,3 +1,5 @@
+import { ROADMAP_PROBLEMS } from './public/roadmap-data.js';
+
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store' },
 });
@@ -536,6 +538,30 @@ async function fileResponse(request, env, url) {
   return json({ error: 'Not found.' }, 404);
 }
 
+const roadmapIds = new Set(ROADMAP_PROBLEMS.map(problem => problem.id));
+async function roadmapResponse(request, env, url) {
+  if (url.pathname !== '/api/roadmap' && !url.pathname.startsWith('/api/roadmap/')) return null;
+  if (request.method !== 'GET' && !sameOrigin(request, url)) return json({ error: 'Invalid origin.' }, 403);
+  if (url.pathname === '/api/roadmap' && request.method === 'GET') {
+    const { results } = await env.DB.prepare('SELECT problem_id, completed, updated_at FROM roadmap_progress').all();
+    return json(results);
+  }
+  const id = url.pathname.slice('/api/roadmap/'.length);
+  if (!roadmapIds.has(id)) return json({ error: 'Roadmap problem not found.' }, 404);
+  if (request.method !== 'PUT') return json({ error: 'Method not allowed.' }, 405);
+  const text = await request.text();
+  if (text.length > 512) return json({ error: 'Progress update is too large.' }, 413);
+  let data;
+  try { data = JSON.parse(text); } catch { return json({ error: 'Invalid progress update.' }, 400); }
+  if (typeof data?.completed !== 'boolean') return json({ error: 'Completed must be true or false.' }, 400);
+  const updatedAt = new Date().toISOString();
+  // One row per problem: another device's changes to other problems cannot be overwritten.
+  await env.DB.prepare(
+    'INSERT INTO roadmap_progress (problem_id, completed, updated_at) VALUES (?, ?, ?) ON CONFLICT(problem_id) DO UPDATE SET completed = excluded.completed, updated_at = excluded.updated_at'
+  ).bind(id, Number(data.completed), updatedAt).run();
+  return json({ problem_id: id, completed: Number(data.completed), updated_at: updatedAt });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -549,6 +575,8 @@ export default {
         return json({ error: 'Sign in required.' }, 401);
       }
       if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+      const roadmap = await roadmapResponse(request, env, url);
+      if (roadmap) return roadmap;
       const image = await imageResponse(request, env, url);
       if (image) return image;
       const time = await timeResponse(request, env, url);
@@ -633,7 +661,7 @@ export default {
       return json({ error: 'Not found.' }, 404);
     } catch (error) {
       console.error(error);
-      return json({ error: 'Could not save or load notes. Please try again.' }, 500);
+      return json({ error: 'Could not save or load data. Please try again.' }, 500);
     }
   },
 };

@@ -36,3 +36,8 @@ CREATE TABLE IF NOT EXISTS files (
   size INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+CREATE TABLE IF NOT EXISTS roadmap_progress (
+  problem_id TEXT PRIMARY KEY,
+  completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+  updated_at TEXT NOT NULL
+);
