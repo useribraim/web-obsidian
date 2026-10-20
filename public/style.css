@@ -51,7 +51,7 @@ a.tool { text-decoration: none; }
 #restore:hover { background: #2f3d2f; }
 
 kbd { font: inherit; opacity: .5; margin-left: 8px; }
-.editor { width: 100%; max-width: 1100px; margin: 24px auto 0; padding: 0 32px; flex: 1; min-height: 0; display: flex; align-items: stretch; }
+.editor { width: 100%; margin: 24px 0 0; padding: 0 32px; flex: 1; min-height: 0; display: flex; align-items: stretch; }
 .editor > * { flex: 1 1 0; min-width: 0; min-height: 0; }
 .editor[data-view="edit"] #preview { display: none; }
 .editor[data-view="preview"] #content { display: none; }
@@ -308,9 +308,9 @@ body.focus .fold-note { padding-top: 8px; }
 .menu-item.danger { color: #e7a39c; border-top: 1px solid #333; margin-top: 4px; border-radius: 0 0 5px 5px; }
 .menu-item.danger:hover { background: #3b2828; }
 
-/* Reading width: a line of about 75 characters is easiest to read. */
-.editor[data-view="edit"] #content { max-width: 80ch; margin: 0 auto; }
-.editor[data-view="preview"] #preview { max-width: 74ch; margin: 0 auto; }
+/* Keep the scrollable note panes as wide as the available page. */
+.editor[data-view="edit"] #content { width: 100%; }
+.editor[data-view="preview"] #preview { width: 100%; }
 #preview { line-height: 1.7; }
 #preview h3 { margin-top: 1.7em; }
 #preview > .earlier + h3, #preview > :first-child { margin-top: 0; }
