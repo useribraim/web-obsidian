@@ -98,7 +98,7 @@
   }
 
   // Compact mode keeps this many days open, counting the last day heading.
-  const DAYS_SHOWN = 5;
+  const DAYS_SHOWN = 1;
   // Midnight of the oldest day that stays open.
   function shownFromDay(last, count = DAYS_SHOWN) {
     return new Date(last.getFullYear(), last.getMonth(), last.getDate() - (count - 1)).getTime();

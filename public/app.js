@@ -13,7 +13,7 @@ const purgeButton = document.querySelector('#purge');
 const viewButtons = [...document.querySelectorAll('.view-option')];
 const spellcheck = document.querySelector('#spellcheck');
 const unravelButton = document.querySelector('#unravel');
-// Notes open compact: the last five days, and the rest behind a dropdown. The
+// Notes open compact: the last day, and the rest behind a dropdown. The
 // quiet button beside the view buttons unravels the whole note. It is not
 // remembered, so every visit starts compact.
 let unraveled = false;
@@ -192,9 +192,9 @@ function renderPreview() {
   preview.innerHTML = renderMarkdown(noteText());
   if (!unraveled) foldEarlierWeeks();
 }
-// Compact mode shows the last five days of a note, and puts every earlier day in a
+// Compact mode shows the last day of a note, and puts every earlier day in a
 // dropdown, grouped by week and month. A day heading ("### 9/28") carries the date; weeks.js
-// reads it. The five days end on the last dated heading, so a note looks the same
+// reads it. The open day is the last dated heading, so a note looks the same
 // on any day. Earlier tasks that are still open are listed above the preview.
 const WEEK_KEY = 'noteWeekPick';
 let weekPick = '';

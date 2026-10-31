@@ -18,7 +18,7 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
   and not done. Click a check box in the preview to flip it there.
 - Open the **⋯** menu and tick **Focus mode** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
-- Notes with day headings open compact, every time. The last five days stay
+- Notes with day headings open compact, every time. Only the last day stays
   open. Every earlier day waits in the **Earlier weeks** dropdown above the
   preview, grouped by month, with the days and open tasks of each week. Pick a
   week, or **All of** a month, to read it there, and **Close** to put it away. A
@@ -27,7 +27,7 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
   in the preview, and every line in the editor. Click it again to fold. It is not
   remembered, so the next visit starts compact. The number of open days is
   `DAYS_SHOWN` in `public/weeks.js`.
-  - The five days end on the last day heading in the note, so the note
+  - The open day is the last day heading in the note, so the note
     looks the same on any day. A heading starts with a date: `9/28`, `28/9`,
     `01/10`, `9.28`, `9/28/2026`, `2026-10-01`, or a month in words such as
     `3 oct 2026`, `10 oct`, `Oct 3` or `Mon 5th October`. Each date is read against the
