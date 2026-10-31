@@ -30,7 +30,8 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
   - The open day is the last day heading in the note, so the note
     looks the same on any day. A heading starts with a date: `9/28`, `28/9`,
     `01/10`, `9.28`, `9/28/2026`, `2026-10-01`, or a month in words such as
-    `3 oct 2026`, `10 oct`, `Oct 3` or `Mon 5th October`. Each date is read against the
+    `3 oct 2026`, `10 oct`, `Oct 3`, `Mon 5th October`, or a Russian month such as
+    `31 октября` or `31 oktabrya`. Each date is read against the
     heading before it, so `01/10` after `9/30` is the 1st of October. Month first
     wins when both readings fit. A line in a fenced code block is not a heading.
   - **Still open** lists the tasks left open in earlier weeks, with the week each
