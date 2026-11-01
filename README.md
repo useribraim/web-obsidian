@@ -7,7 +7,7 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 
 ## Notes
 
-- The toolbar keeps the save status, the view buttons (**Edit**, **Split**, **Preview**), the unravel arrow and **Image** in the open. A note saves by itself, so there is no Save button; ⌘S saves at once, and ⌘B and ⌘I still make bold and italic. The **⋯** menu holds **Focus mode**, **Spell check**, a **Markdown cheatsheet** and **Delete**. Delete still asks first.
+- The toolbar keeps the save status, the view buttons (**Edit**, **Live**, **Split**, **Preview**), the unravel arrow and **Image** in the open. A note saves by itself, so there is no Save button; ⌘S saves at once, and ⌘B and ⌘I still make bold and italic. The **⋯** menu holds **Focus mode**, **Spell check**, a **Markdown cheatsheet** and **Delete**. Delete still asks first.
 - The box above the list searches titles and text. Each note shows when it was last edited. In **Edit** and **Preview** the text sits in a column of about 75 characters.
 
 - Markdown source on the left, live preview on the right.
@@ -16,6 +16,11 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
 - ⌘L turns the current line into a task (`- [ ]`) or flips it between done
   and not done. Click a check box in the preview to flip it there.
+- **Live** edits the rendered note, as Obsidian's Live Preview does. The line with
+  the caret shows its Markdown, and every other line shows the result. Click a check
+  box to tick a task. The view is in `public/live-view.js` and `public/tokenizer.js`.
+  The textarea stays the source of the note, so saving, folding and the shortcuts
+  work as in **Edit**.
 - Open the **⋯** menu and tick **Focus mode** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
 - Notes with day headings open compact, every time. Only the last day stays

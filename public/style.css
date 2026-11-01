@@ -57,6 +57,9 @@ kbd { font: inherit; opacity: .5; margin-left: 8px; }
 .editor[data-view="preview"] #content { display: none; }
 .editor[data-view="edit"] #content { padding-right: 0; }
 .editor[data-view="preview"] #preview { border-left: 0; padding-left: 0; }
+/* Live view shows one rendered, editable note. The textarea stays as the source. */
+.editor:not([data-view="live"]) #live { display: none; }
+.editor[data-view="live"] #content, .editor[data-view="live"] #preview { display: none; }
 input, textarea { color: #d4d4d4; background: transparent; border: 0; outline: none; }
 .rename { display: block; width: 100%; padding: 9px 12px; margin-bottom: 3px; font-size: 13px; color: #c9bcdf; background: #232323; border: 1px solid #a899ce; border-radius: 5px; }
 #content { resize: none; overflow: auto; padding: 0 26px 36px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--note-size); line-height: 1.75; tab-size: 2; }
@@ -311,6 +314,7 @@ body.focus .fold-note { padding-top: 8px; }
 /* Keep the scrollable note panes as wide as the available page. */
 .editor[data-view="edit"] #content { width: 100%; }
 .editor[data-view="preview"] #preview { width: 100%; }
+.editor[data-view="live"] #live { width: 100%; }
 #preview { line-height: 1.7; }
 #preview h3 { margin-top: 1.7em; }
 #preview > .earlier + h3, #preview > :first-child { margin-top: 0; }

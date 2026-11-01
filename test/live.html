@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live view harness</title>
+  <style>
+    :root { color-scheme: dark; background: #1e1e1e; color: #d4d4d4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; display: grid; grid-template-columns: 1fr 340px; height: 100vh; }
+    #live { padding: 20px 26px; }
+    aside { border-left: 1px solid #292929; padding: 12px; overflow: auto; font: 12px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+  </style>
+  <link rel="stylesheet" href="../public/live-view.css">
+</head>
+<body>
+  <div id="live" spellcheck="false" placeholder="Start writing…"></div>
+  <aside id="source"></aside>
+  <script src="../public/tokenizer.js"></script>
+  <script src="../public/live-view.js"></script>
+  <script>
+    const live = LiveView.create(document.querySelector('#live'));
+    const source = document.querySelector('#source');
+    const show = () => { source.textContent = 'sel ' + live.selectionStart + '-' + live.selectionEnd + '\n\n' + live.value; };
+    live.addEventListener('input', show);
+    document.addEventListener('selectionchange', show);
+    live.value = [
+      '# Live view',
+      '',
+      'A paragraph with **bold**, *italic*, ~~strike~~, `code` and a [link](https://example.com).',
+      '',
+      '## Tasks',
+      '- [ ] write the tokenizer',
+      '- [x] write the line view',
+      '  - nested bullet',
+      '1. first',
+      '2. second',
+      '',
+      '> a quote with **bold**',
+      '',
+      '---',
+      '',
+      '```js',
+      'const a = "**not bold**";',
+      '```',
+      '',
+      'Inline picture: ![dot](/public/favicon.svg) in a line.',
+      '',
+      'The end.'
+    ].join('\n');
+    show();
+    window.live = live;
+  </script>
+</body>
+</html>

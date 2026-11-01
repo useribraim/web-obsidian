@@ -14,7 +14,10 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="mask-icon" href="/mask-icon.svg" color="#202020">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/live-view.css">
   <script src="/weeks.js" defer></script>
+  <script src="/tokenizer.js" defer></script>
+  <script src="/live-view.js" defer></script>
   <script src="/app.js" defer></script>
   <script src="/pdf-view.js" defer></script>
   <script src="/books.js" defer></script>
@@ -96,7 +99,7 @@
     </section>
     <div class="toolbar">
       <span id="status" role="status">Loading…</span>
-      <span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span>
+      <span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="live" aria-label="Live view: edit the rendered note">Live</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span>
       <button id="unravel" class="tool" type="button" aria-pressed="false" title="Unravel: show every week and day">⤢</button>
       <span id="format-group" class="format" role="group" aria-label="Insert"></span>
       <button id="restore" class="tool" hidden>Restore</button>
@@ -132,6 +135,7 @@
     <div id="fold-note" class="fold-note" hidden><span id="fold-text"></span><button id="fold-toggle" class="tool" type="button">Show all</button></div>
     <section class="editor" id="editor" data-view="split">
       <textarea id="content" aria-label="Note content" placeholder="Start writing…" maxlength="200000" spellcheck="true"></textarea>
+      <div id="live" aria-label="Live note" placeholder="Start writing…" spellcheck="true"></div>
       <div id="preview" aria-label="Preview"></div>
     </section>
     <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>

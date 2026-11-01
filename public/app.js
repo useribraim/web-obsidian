@@ -1,6 +1,29 @@
 const content = document.querySelector('#content');
 const preview = document.querySelector('#preview');
 const editor = document.querySelector('#editor');
+// Live view edits the rendered note, as Obsidian does: the line with the caret
+// shows its Markdown, and every other line shows the result. The textarea stays
+// the source of the note. Each edit here is copied into it, and every change to
+// it is copied back here, so saving, folding and the toolbar work unchanged.
+const live = LiveView.create(document.querySelector('#live'));
+live.addEventListener('input', () => {
+  content.value = live.value;
+  content.setSelectionRange(live.selectionStart, live.selectionEnd);
+  content.dispatchEvent(new Event('input', { bubbles: true }));
+});
+// The toolbar and the shortcuts read the selection from the textarea.
+document.addEventListener('selectionchange', event => {
+  if (event.target !== document || document.activeElement !== live) return;
+  content.setSelectionRange(live.selectionStart, live.selectionEnd);
+});
+function syncLive() {
+  if (editor.dataset.view !== 'live' || live.value === content.value) return;
+  live.value = content.value;
+  if (document.activeElement === live) {
+    live.setSelectionRange(content.selectionStart, content.selectionEnd);
+    window.getSelection().focusNode?.parentElement?.scrollIntoView({ block: 'nearest' });
+  }
+}
 const list = document.querySelector('#notes');
 const status = document.querySelector('#status');
 const newButton = document.querySelector('#new');
@@ -187,7 +210,8 @@ function renderMarkdown(source) {
   return html;
 }
 function renderPreview() {
-  if (editor.dataset.view === 'edit') return;
+  syncLive();
+  if (editor.dataset.view === 'edit' || editor.dataset.view === 'live') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());
   if (!unraveled) foldEarlierWeeks();
@@ -479,6 +503,13 @@ function toggleTasks() {
   else content.setSelectionRange(start, start + text.length);
 }
 function replaceSelection(text, start, end) {
+  // In Live view the textarea is hidden and cannot take typing, so the text goes
+  // in directly, and the input event copies it to the live view.
+  if (editor.dataset.view === 'live') {
+    content.setRangeText(text, start, end, 'end');
+    content.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
   content.focus();
   content.setSelectionRange(start, end);
   let ok = false;
@@ -533,6 +564,7 @@ function wrapSelection(marker) {
 function updateControls() {
   const trashed = Boolean(current?.deleted_at);
   content.disabled = busy || trashed || (mode === 'trash' && !current);
+  live.disabled = content.disabled;
   deleteButton.hidden = mode === 'trash';
   deleteButton.disabled = busy;
   restoreButton.hidden = !trashed;
@@ -912,7 +944,7 @@ content.addEventListener('blur', () => { tabMovesFocus = false; });
 const VIEW_KEY = 'noteView';
 try {
   const saved = localStorage.getItem(VIEW_KEY);
-  if (saved && ['edit', 'split', 'preview'].includes(saved)) view = saved;
+  if (saved && ['edit', 'live', 'split', 'preview'].includes(saved)) view = saved;
 } catch {}
 function applyView() {
   editor.dataset.view = view;
@@ -985,7 +1017,7 @@ function refoldKeepingCaret() {
   const split = Math.max(0, openFromOffset(noteText()));
   if (split === foldedSource.length) return;
   const caret = content.selectionEnd + foldedSource.length;
-  if (document.activeElement === content && caret < split) return;
+  if ((document.activeElement === content || document.activeElement === live) && caret < split) return;
   const before = content.clientWidth ? sourceOffsetTop(content.selectionEnd) - content.scrollTop : 0;
   resplitSource();
   movedByCode.add(content);
@@ -1012,17 +1044,19 @@ spellcheck.addEventListener('change', () => {
 applySpellcheck();
 document.addEventListener('keydown', event => {
   if (!(event.metaKey || event.ctrlKey)) return;
+  // The selectionchange event can come after a fast key, so read the caret now.
+  if (document.activeElement === live) content.setSelectionRange(live.selectionStart, live.selectionEnd);
   const key = event.key.toLowerCase();
   if (key === 's') {
     event.preventDefault();
     if (!busy && mode === 'active') saveNote();
-  } else if ((key === 'b' || key === 'i') && document.activeElement === content) {
+  } else if ((key === 'b' || key === 'i') && (document.activeElement === content || document.activeElement === live)) {
     event.preventDefault();
     if (mode === 'active') wrapSelection(key === 'b' ? '**' : '*');
   } else if (key === '\\' && !event.shiftKey && !event.altKey) {
     event.preventDefault();
     applyCollapsed(!document.body.classList.contains('collapsed'));
-  } else if (key === 'l' && document.activeElement === content && !event.shiftKey && !event.altKey) {
+  } else if (key === 'l' && (document.activeElement === content || document.activeElement === live) && !event.shiftKey && !event.altKey) {
     event.preventDefault();
     toggleTasks();
   }
@@ -1160,8 +1194,10 @@ async function uploadImages(files) {
     insertingImage = true;
     try { replaceSelection(markdown, start, end); }
     finally { insertingImage = false; }
-    view = window.matchMedia('(max-width: 600px)').matches ? 'preview' : 'split';
-    applyView();
+    if (view !== 'live') {
+      view = window.matchMedia('(max-width: 600px)').matches ? 'preview' : 'split';
+      applyView();
+    }
   }
   if (failure) message(failure, true);
 }
@@ -1171,12 +1207,13 @@ imageFile.onchange = () => {
   imageFile.value = '';
   uploadImages(files);
 };
-content.addEventListener('paste', event => {
+for (const field of [content, live]) field.addEventListener('paste', event => {
   const files = [...(event.clipboardData?.files || [])];
   if (!files.length) return;
   event.preventDefault();
+  event.stopImmediatePropagation();
   uploadImages(files);
-});
+}, true);
 editor.addEventListener('dragover', event => {
   if (![...event.dataTransfer.types].includes('Files')) return;
   event.preventDefault();
