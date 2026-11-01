@@ -32,3 +32,14 @@ test('compact mode keeps only the last day open', () => {
   const last = new Date(2026, 9, 31);
   assert.equal(NoteWeeks.shownFromDay(last), last.getTime());
 });
+
+test('a month name with a small typo is still a month', () => {
+  const dates = NoteWeeks.assignDates(['31 oktabrya', '1 novmber', '2 noyabria'], today);
+  assert.deepEqual(dates.map(day), [new Date(2026, 9, 31), new Date(2026, 10, 1), new Date(2026, 10, 2)].map(day));
+});
+
+test('a word close to a short month name is not a month', () => {
+  for (const heading of ['3 mayor', '2 market', '1 decision', '4 junior', '5 octopus']) {
+    assert.equal(NoteWeeks.parseDay(heading, today), null, heading);
+  }
+});

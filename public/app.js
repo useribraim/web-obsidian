@@ -975,11 +975,30 @@ function toggleUnravel() {
 unravelButton.addEventListener('click', toggleUnravel);
 foldToggle.addEventListener('click', toggleUnravel);
 showUnraveled();
-// Starting a new week changes what the preview folds. The editor catches up when
-// you leave it, so the text never moves under the caret while you type.
-content.addEventListener('blur', () => {
+// Starting a new day changes what the preview folds. The editor catches up when
+// you pause in the new day, or when you leave it. The caret keeps its place on the
+// screen, so the text above it goes away without moving what you type.
+const REFOLD_PAUSE = 800;
+let refoldTimer;
+function refoldKeepingCaret() {
   if (unraveled) return;
-  if (Math.max(0, openFromOffset(noteText())) !== foldedSource.length) resplitSource();
+  const split = Math.max(0, openFromOffset(noteText()));
+  if (split === foldedSource.length) return;
+  const caret = content.selectionEnd + foldedSource.length;
+  if (document.activeElement === content && caret < split) return;
+  const before = content.clientWidth ? sourceOffsetTop(content.selectionEnd) - content.scrollTop : 0;
+  resplitSource();
+  movedByCode.add(content);
+  if (content.clientWidth) content.scrollTop = Math.max(0, sourceOffsetTop(content.selectionEnd) - before);
+  requestAnimationFrame(() => movedByCode.delete(content));
+}
+content.addEventListener('input', () => {
+  clearTimeout(refoldTimer);
+  refoldTimer = setTimeout(refoldKeepingCaret, REFOLD_PAUSE);
+});
+content.addEventListener('blur', () => {
+  clearTimeout(refoldTimer);
+  refoldKeepingCaret();
 });
 const SPELL_KEY = 'noteSpellcheck';
 try {

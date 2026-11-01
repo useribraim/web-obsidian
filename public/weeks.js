@@ -85,6 +85,31 @@
     return best ? best.date : null;
   }
 
+  // A month name, or a slip of the keyboard in a long one: "novmber" and "oktyabraya"
+  // still name a month. The first three letters must be right, and one wrong letter
+  // is allowed in a name of five or six letters, two in a longer one. So "mayor",
+  // "market" and "decision" stay words.
+  function monthNamed(word) {
+    if (MONTHS[word] !== undefined) return MONTHS[word];
+    for (const [name, month] of Object.entries(MONTHS)) {
+      if (name.length < 5 || name.slice(0, 3) !== word.slice(0, 3)) continue;
+      if (editDistance(word, name) <= (name.length >= 7 ? 2 : 1)) return month;
+    }
+    return undefined;
+  }
+
+  function editDistance(a, b) {
+    let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i += 1) {
+      const current = [i];
+      for (let j = 1; j <= b.length; j += 1) {
+        current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      previous = current;
+    }
+    return previous[b.length];
+  }
+
   // A month written as a word: "3 oct 2026" or "Oct 3".
   function parseNamedDay(trimmed, anchor, fromHeading) {
     let day, name, year;
@@ -92,7 +117,7 @@
     if (match) [, day, name, year] = match;
     else if ((match = MONTH_DAY.exec(trimmed))) [, name, day, year] = match;
     else return null;
-    const month = MONTHS[name.toLowerCase()];
+    const month = monthNamed(name.toLowerCase());
     if (month === undefined) return null;
     return bestReading([{ month, day: Number(day), penalty: 0 }], year ? Number(year) : null, anchor, fromHeading);
   }
