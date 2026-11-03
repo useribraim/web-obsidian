@@ -22,6 +22,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test the notebook and MCP server
+        run: npm test
+
       # Each migration in this list must be safe to run more than once.
       - name: Apply the database migrations
         uses: cloudflare/wrangler-action@v3
@@ -43,6 +49,20 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wranglerVersion: "4"
           command: d1 execute ibraim-obsidian-notes --remote --file migrations/0006_add_files.sql
+
+      - name: Apply the MCP migration
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4"
+          command: d1 execute ibraim-obsidian-notes --remote --file migrations/0008_add_mcp.sql
+
+      - name: Apply the roadmap migration
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4"
+          command: d1 execute ibraim-obsidian-notes --remote --file migrations/0009_add_roadmap.sql
 
       - name: Deploy the Worker
         uses: cloudflare/wrangler-action@v3

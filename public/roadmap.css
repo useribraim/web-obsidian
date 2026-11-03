@@ -1,0 +1,56 @@
+body.roadmap-page { display: block; height: auto; min-height: 100dvh; }
+.roadmap { display: block; max-width: 760px; margin: 0 auto; padding: 28px 28px 72px; }
+.roadmap-back { color: #8c8c8c; font-size: 13px; text-decoration: none; }
+.roadmap-back:hover { color: #d4d4d4; }
+.roadmap-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 36px 0 14px; }
+.roadmap-head h1 { font-size: 30px; font-weight: 600; letter-spacing: -.035em; margin: 0; }
+.roadmap-total { margin: 0; font-size: 13px; color: #a8a8a8; font-variant-numeric: tabular-nums; }
+.roadmap-bar { height: 4px; border-radius: 2px; background: #2a2a2a; overflow: hidden; }
+.roadmap-bar i { display: block; height: 100%; width: 0; background: #a899ce; transition: width .4s ease; }
+.roadmap-languages { min-height: 18px; margin: 12px 0 0; font-size: 12px; color: #8c8c8c; }
+.roadmap-languages b { color: #c9bcdf; font-weight: 550; }
+
+.roadmap-form { margin: 28px 0 36px; }
+.roadmap-form textarea { width: 100%; min-height: 84px; resize: vertical; padding: 12px 14px; font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: #d4d4d4; background: #202020; border: 1px solid #343434; border-radius: 8px; }
+.roadmap-form textarea:focus { outline: none; border-color: #a899ce; }
+.roadmap-form textarea::placeholder { color: #6f6f6f; }
+.roadmap-form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.roadmap-default { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8c8c8c; }
+.roadmap-default select { padding: 6px 8px; font: inherit; color: #d4d4d4; background: #202020; border: 1px solid #343434; border-radius: 6px; }
+.roadmap-primary { padding: 9px 22px; font-size: 13px; color: #1e1e1e; background: #a899ce; }
+.roadmap-primary:hover { background: #bbaedc; }
+.roadmap-status { min-height: 18px; margin: 10px 0 0; font-size: 12px; color: #8c8c8c; }
+.roadmap-status.error { color: #e7a39c; }
+.roadmap-status button { color: #c9bcdf; text-decoration: underline; padding: 0 4px; }
+.roadmap-unmatched { margin-top: 12px; padding: 12px 14px; font-size: 13px; color: #c8b27a; background: #26231b; border: 1px solid #4a4128; border-radius: 8px; }
+.roadmap-unmatched p { margin: 0 0 8px; }
+.roadmap-unmatched ul { margin: 0 0 10px; padding-left: 18px; color: #d4d4d4; }
+.roadmap-unmatched button { padding: 6px 12px; margin-right: 6px; font-size: 12px; background: #333; }
+.roadmap-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.roadmap-categories { display: grid; gap: 2px; }
+.roadmap-category { border-top: 1px solid #272727; }
+.roadmap-category summary { display: grid; grid-template-columns: 1fr 90px 52px; align-items: center; gap: 16px; padding: 14px 4px; cursor: pointer; list-style: none; font-size: 14px; color: #d4d4d4; }
+.roadmap-category summary::-webkit-details-marker { display: none; }
+.roadmap-category summary:hover { color: #fff; }
+.roadmap-category summary:focus-visible { outline: 2px solid #a899ce; outline-offset: 2px; }
+.roadmap-category .count { text-align: right; font-size: 12px; color: #8c8c8c; font-variant-numeric: tabular-nums; }
+.roadmap-category .mini { height: 3px; border-radius: 2px; background: #2a2a2a; overflow: hidden; }
+.roadmap-category .mini i { display: block; height: 100%; background: #a899ce; }
+.roadmap-category.done .count { color: #a899ce; }
+.roadmap-problems { list-style: none; margin: 0 0 12px; padding: 0 4px 0 4px; }
+.roadmap-problems li { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; font-size: 13px; color: #7d7d7d; }
+.roadmap-problems li::before { content: '○'; font-size: 11px; color: #555; }
+.roadmap-problems li.solved { color: #cfcfcf; }
+.roadmap-problems li.solved::before { content: '●'; color: #a899ce; }
+.roadmap-problems .meta { margin-left: auto; text-align: right; font-size: 11px; color: #8c8c8c; }
+.roadmap-problems .meta button { padding: 0 3px; font-size: 13px; color: #6f6f6f; }
+.roadmap-problems .meta button:hover { color: #e7a39c; background: transparent; }
+
+@media (max-width: 600px) {
+  .roadmap { padding: 20px 16px 48px; }
+  .roadmap-head { margin-top: 28px; }
+  .roadmap-category summary { grid-template-columns: 1fr 56px 46px; gap: 10px; }
+  .roadmap-problems li { flex-wrap: wrap; }
+  .roadmap-problems .meta { flex-basis: 100%; text-align: left; margin-left: 21px; }
+}

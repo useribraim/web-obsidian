@@ -4,7 +4,7 @@
   "compatibility_date": "2026-09-11",
   "account_id": "ea84b3f427fd457e23bf7a6a93f3f3a6",
   "workers_dev": false,
-  "routes": [{ "pattern": "obsidian.ibraim.ie", "custom_domain": true }],
+  "routes": [{ "pattern": "obsidian.ibraim.ie", "custom_domain": true }, { "pattern": "prep.ibraim.ie", "custom_domain": true }],
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
   "r2_buckets": [{ "binding": "BOOKS", "bucket_name": "ibraim-obsidian-books" }],
   "d1_databases": [{

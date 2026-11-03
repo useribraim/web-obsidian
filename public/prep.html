@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19181c">
+  <title>Interview prep — Ibraim</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/interview.css">
+  <link rel="stylesheet" href="/prep.css">
+  <script src="/interview.js" type="module"></script>
+</head>
+<body>
+  <header class="prep-header"><a href="/prep.html">◇ Ibraim / prep</a><a href="https://obsidian.ibraim.ie">My notes ↗</a></header>
+  <main id="app-main" data-page="interview" data-standalone="prep">
+    <section id="interview-view" class="interview" aria-label="Interview prep">
+      <div class="interview-content">
+        <div class="interview-heading"><button id="interview-close" class="tool" type="button">‹ Notes</button><span>Practice → understand → revisit</span></div>
+        <div class="interview-intro"><span class="interview-eyebrow">A SMALL DAILY PRACTICE</span><h1>Interview prep</h1><p>Ten questions. Keep what you missed.</p></div>
+        <p id="interview-recovery" class="interview-warning" role="status" hidden></p>
+        <div id="interview-setup" class="interview-card">
+          <h2>What are we working on?</h2>
+          <p>Choose a topic for a shuffled MCQ round, with an explanation after every answer.</p>
+          <label for="interview-topic">Practice topic</label><select id="interview-topic"></select>
+          <div class="interview-details"><span>10 multiple-choice questions</span><span>About 5–10 minutes</span></div>
+          <button id="interview-start" class="tool interview-primary" type="button">Start a round →</button>
+          <div class="interview-save-hint"><strong>Turn your mistakes into study notes.</strong><p>Missed questions and explanations are saved to your notebook. You can also download them as Markdown.</p></div>
+          <p class="interview-bank">40 questions covering Python 3 and modern C++17, from fundamentals to intermediate.</p>
+        </div>
+        <div id="interview-round" hidden>
+          <div class="interview-round-meta"><span id="interview-round-topic"></span><span id="interview-step"></span></div>
+          <progress id="interview-progress" max="10" value="0" aria-label="Questions answered"></progress>
+          <form id="interview-form" class="interview-card">
+            <fieldset id="interview-choices"><legend id="interview-question" tabindex="-1"></legend><div id="interview-options"></div></fieldset>
+            <div id="interview-feedback" class="interview-feedback" role="status" hidden></div>
+            <button id="interview-check" class="tool interview-primary" type="submit" disabled>Check answer</button>
+            <button id="interview-next" class="tool interview-primary" type="button" hidden>Next question →</button>
+          </form>
+          <p class="interview-bank">Your unfinished round stays in this tab through reloads.</p>
+        </div>
+        <div id="interview-results" hidden>
+          <div class="interview-card interview-summary"><span class="interview-eyebrow">ROUND COMPLETE</span><h2 id="interview-score" tabindex="-1"></h2><p id="interview-result-message"></p></div>
+          <div class="interview-result-actions">
+            <button id="interview-download" class="tool" type="button">Download mistakes .md</button>
+            <button id="interview-note" class="tool" type="button" hidden>Open notebook ↗</button>
+            <button id="interview-save-retry" class="tool" type="button" hidden>Retry save</button>
+            <button id="interview-again" class="tool interview-primary" type="button">New round →</button>
+          </div>
+          <p id="interview-save-status" role="status"></p>
+          <h2 id="interview-review-heading">Your review list</h2><div id="interview-mistakes"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

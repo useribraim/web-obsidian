@@ -2,8 +2,81 @@
 
 A password-protected notebook with a time tracker, at https://obsidian.ibraim.ie.
 
-One Cloudflare Worker, one D1 database, no build step. Everything is in
-`worker.js` and `public/`.
+One Cloudflare Worker, one D1 database, no frontend build step. The site is in
+`worker.js` and `public/`; `mcp.js` and `mcp-auth.js` provide agent access.
+
+## Notebook MCP
+
+**Agent connections** in the sidebar opens `/agents.html`. The notebook's remote
+MCP endpoint is `https://obsidian.ibraim.ie/mcp`, using **Streamable HTTP**.
+Agents and the browser use the same notes in D1. No separate agent runner,
+model provider, or vector database is required.
+
+### Connect a harness
+
+- In a client that supports remote MCP and OAuth, add the endpoint URL. It will
+  open the notebook's sign-in and consent page. Check the client name and the
+  requested permissions before approving. A client name is self-reported, not
+  proof that an application is trustworthy.
+- For a harness that accepts custom HTTP headers, create a personal token in
+  **Agent connections** and send `Authorization: Bearer <token>` to `/mcp`.
+  Tokens are shown only once. Use the harness's secret store or environment
+  variables; do not commit one to a configuration file or paste it into a note.
+- MCP configuration formats differ by harness. The required settings are a
+  remote HTTP server URL and either OAuth or a bearer authorization header.
+  A stdio-only client needs a remote-MCP adapter; a bare model is not itself
+  an MCP client. The deprecated standalone SSE transport is not provided.
+
+### Permissions and tools
+
+| Permission | Available tools |
+| --- | --- |
+| `notes:read` | `list_notes`, `search_notes`, `read_note` |
+| `notes:create` | `create_note` |
+| `notes:append` | `append_to_note` |
+| `notes:edit` | `update_note` |
+
+Permissions apply to **all active notes**, not selected notes or folders. Read
+access is opt-in: the token form defaults to create-only access. Write-only
+tools return metadata rather than existing note content. Append and edit need
+a note ID; listing and discovering IDs requires Read or an ID supplied by you.
+Editing also needs the current version, which can be obtained with Read.
+
+Updates check the expected version and reject stale writes. Appends are atomic
+and increment the version, so a browser with older content cannot silently
+overwrite them. Existing note limits apply: 200 title characters and 200,000
+content characters. Agent writes are attributed in `mcp_note_events`.
+Trashed notes, deletion, images, books, files, roadmap progress, and the time
+tracker are not exposed. The page may need to reopen a note to show an agent's
+latest edit; this is not a collaborative live editor.
+
+### Access lifecycle
+
+- Personal tokens and OAuth access/refresh tokens are stored only as hashes.
+- OAuth uses authorization codes with PKCE S256, exact registered redirect
+  URIs, explicit consent, short-lived access tokens, and rotating refresh tokens.
+  OAuth connections expire after 30 days; reconnect to renew consent. Detected
+  refresh-token replay revokes the connection.
+- Both personal tokens and OAuth grants appear in **Agent connections** and
+  can be revoked independently. Revocation blocks subsequent requests, not
+  work already in progress or copies of text already read by a client.
+- Changing the notebook password does not revoke existing MCP connections.
+  Revoke them separately if a harness or token is compromised.
+- A request with an `Origin` header must come from this site's origin. Remote
+  harnesses normally call from their backend or CLI without that header;
+  direct cross-origin browser MCP calls are not enabled.
+- Treat note text as untrusted reference material, not instructions that grant
+  an agent additional authority. Only connect clients you trust. Do not place
+  employer-confidential data here or send it to an external model unless your
+  employer's policy explicitly permits it.
+
+Existing databases need `migrations/0008_add_mcp.sql`; the deployment workflow
+applies it before deploying. Install dependencies with `npm ci`. Run
+`npm test` for protocol, authentication, persistence, and concurrency tests,
+and `npm run check:worker` to check the Cloudflare bundle. Browser scenarios
+are in `test/agents.browser.mjs` and use intercepted requests, not real tokens.
+`test/mcp-oauth.browser.mjs` exercises native browser consent, code exchange,
+refresh, and replay revocation against an isolated local Wrangler database.
 
 ## Notes
 
@@ -11,6 +84,7 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - The box above the list searches titles and text. Each note shows when it was last edited. In **Edit** and **Preview** the text sits in a column of about 75 characters.
 
 - Markdown source on the left, live preview on the right.
+- Opening a note places the editor and preview at its latest dated heading. Notes without day headings start at the top.
 - Tab indents. An indented list line nests under the line above it, and an
   indented paragraph keeps its indent in the preview.
 - Autosave. ⌘S saves now, ⌘B and ⌘I wrap the selection.
@@ -55,6 +129,44 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 - The **Trash** is the wire-mesh bin at the foot of the sidebar. It shows paper when it holds a note. Click it to see the trashed notes, and click **Back** to return.
 - The **‹** button in the sidebar header folds the sidebar to a narrow rail, and **›** brings it back. ⌘\ (Ctrl+\) does the same. The choice is remembered.
 - A version check rejects a save that would overwrite someone else's edit.
+
+## Interview prep
+
+- `prep.ibraim.ie` serves the standalone MCQ site (`public/prep.html`), using
+  the same password and D1 notebook as the notes site. Sign in separately on
+  each hostname. The custom domain is configured in `wrangler.jsonc`; publish
+  it with `npm run deploy`.
+
+- **Interview prep** in the sidebar (or mobile navigation) opens `#/interview`.
+- Choose Python, C++, or a mixed round. Each round shuffles ten questions from
+  a built-in bank of 40 covering Python 3 and C++17; this is not AI-generated
+  and needs no model provider or API key.
+- Filter by fundamentals or intermediate difficulty. Each language has ten
+  questions at each level. After a round, **Practice missed questions** gives
+  a separate retry drill with explanations, without changing the original
+  score or saved note. Retry drills are temporary and reset on reload.
+- **I don’t know — study later** records an unanswered question without guessing.
+  It counts as not yet learned in the score and is included in mistake notes
+  with a basics lesson and code example. **Study later** keeps flagged questions
+  in this browser’s local storage across rounds and visits (not cross-device).
+  Expand a lesson, retry the question, then **Mark understood** to remove it.
+- Select an answer, then **Check answer** for the correct choice and an
+  explanation. Checked answers are locked before moving to the next question.
+- At the end, only wrong answers are saved in a new **Interview mistakes**
+  notebook note, including the question, choices, your answer, correct answer,
+  explanation, and a review checklist. **Download mistakes .md** saves the same
+  Markdown locally. A perfect round creates no mistakes note.
+- Finished notes use the existing D1 notebook storage and are available across
+  signed-in devices. An unfinished round stays in this browser tab’s session
+  storage through navigation and reloads, not across devices or after the tab
+  is closed. A visible warning explains if browser storage is unavailable.
+- Failed saves keep the results available for retry or download. Retrying an
+  ambiguously successful save cannot create a duplicate note or overwrite a
+  subsequent manual edit. No new database migration is needed.
+- `test/interview.test.mjs` covers question data, grading, authentication, and
+  retry-safe persistence. `test/interview.browser.mjs` covers the practice flow,
+  round recovery, save failures, downloads, mobile layouts, and navigation using
+  intercepted requests rather than real notes.
 
 ## Images
 
@@ -131,10 +243,16 @@ One Cloudflare Worker, one D1 database, no build step. Everything is in
 ## Run locally
 
 ```sh
+npm ci
 echo "PASSWORD=anything" > .dev.vars
 npx wrangler d1 execute ibraim-obsidian-notes --local --file schema.sql
-npx wrangler dev
+npm run dev
 ```
+
+The dev command pins the local upstream and host to `127.0.0.1:8787` so OAuth
+resource URLs and browser origins agree. If changing the port, change both
+host settings as well. Do not substitute the production hostname for a local
+OAuth resource URL.
 
 An existing local database needs the files in `migrations/` instead of
 `schema.sql`, in order.

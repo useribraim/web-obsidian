@@ -1,3 +1,8 @@
+import { authenticateMcp, mcpAuthResponse } from './mcp-auth.js';
+import { mcpResponse } from './mcp.js';
+import { interviewResponse } from './interview-api.js';
+import { roadmapResponse } from './roadmap-api.js';
+
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store' },
 });
@@ -517,13 +522,59 @@ export default {
     try {
       const auth = await authResponse(request, env, url);
       if (auth) return auth;
-      if (!(await isAuthenticated(request, env))) {
+      if (url.pathname === '/mcp') {
+        const principal = await authenticateMcp(request, env);
+        if (!principal) {
+          return new Response(JSON.stringify({ error: 'A notebook MCP access token is required.' }), {
+            status: 401,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+              'WWW-Authenticate': `Bearer resource_metadata="${url.origin}/.well-known/oauth-protected-resource/mcp"`,
+            },
+          });
+        }
+        return await mcpResponse(request, env, principal);
+      }
+      const authenticated = await isAuthenticated(request, env);
+      if (url.pathname === '/oauth/authorize' && request.method === 'GET' && !authenticated) {
+        return new Response(loginPage({ next: url.pathname + url.search }), {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "frame-ancestors 'none'",
+          },
+        });
+      }
+      if (url.pathname.startsWith('/oauth/') || url.pathname.startsWith('/.well-known/') || url.pathname.startsWith('/api/agent-connections')) {
+        const response = await mcpAuthResponse(request, env, { authenticated });
+        if (response) return response;
+        return json({ error: 'Not found.' }, 404);
+      }
+      if (!authenticated) {
         if (!url.pathname.startsWith('/api/')) {
           return new Response(loginPage({ next: url.pathname + url.search }), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
         }
         return json({ error: 'Sign in required.' }, 401);
       }
-      if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
+      if (!url.pathname.startsWith('/api/')) {
+        if (url.hostname === 'prep.ibraim.ie' && url.pathname === '/') {
+          const assetUrl = new URL('/prep.html', url);
+          return env.ASSETS.fetch(new Request(assetUrl, request));
+        }
+        const response = await env.ASSETS.fetch(request);
+        if (url.pathname !== '/agents' && url.pathname !== '/agents.html') return response;
+        const headers = new Headers(response.headers);
+        headers.set('Cache-Control', 'no-store');
+        headers.set('X-Frame-Options', 'DENY');
+        headers.set('Content-Security-Policy', "default-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      }
+      const interview = await interviewResponse(request, env, url);
+      if (interview) return interview;
+      const roadmap = await roadmapResponse(request, env, url);
+      if (roadmap) return roadmap;
       const image = await imageResponse(request, env, url);
       if (image) return image;
       const time = await timeResponse(request, env, url);
@@ -608,7 +659,7 @@ export default {
       return json({ error: 'Not found.' }, 404);
     } catch (error) {
       console.error(error);
-      return json({ error: 'Could not save or load notes. Please try again.' }, 500);
+      return json({ error: 'Could not save or load data. Please try again.' }, 500);
     }
   },
 };

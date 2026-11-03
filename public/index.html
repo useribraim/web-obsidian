@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
   <meta name="theme-color" content="#191919">
   <title>Notes</title>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
@@ -14,6 +14,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="mask-icon" href="/mask-icon.svg" color="#202020">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/mobile.css">
+  <link rel="stylesheet" href="/interview.css">
   <link rel="stylesheet" href="/live-view.css">
   <script src="/weeks.js" defer></script>
   <script src="/tokenizer.js" defer></script>
@@ -22,13 +24,24 @@
   <script src="/pdf-view.js" defer></script>
   <script src="/books.js" defer></script>
   <script src="/files.js" defer></script>
+  <script src="/mobile.js" defer></script>
+  <script src="/interview.js" type="module"></script>
 </head>
 <body>
-  <aside>
-    <header><span class="brand"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button><button id="collapse" class="rail-toggle" type="button" aria-label="Collapse the sidebar (⌘\)" aria-expanded="true" title="Collapse the sidebar (⌘\)">‹</button></span></header>
+  <div class="mobile-header">
+    <button id="mobile-nav" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+    <span id="mobile-title">Notes</span>
+    <button id="mobile-timer" type="button" aria-label="Open running timer" hidden></button>
+  </div>
+  <div id="nav-backdrop" hidden></div>
+  <aside id="sidebar" aria-label="Navigation">
+    <header><span class="brand" id="sidebar-title"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button><button id="collapse" class="rail-toggle" type="button" aria-label="Collapse the sidebar (⌘\)" aria-expanded="true" title="Collapse the sidebar (⌘\)">‹</button><button id="mobile-nav-close" type="button" aria-label="Close navigation">×</button></span></header>
     <a id="books-open" class="books-link" href="#/books" title="Open your books">Books</a>
     <a id="files-open" class="books-link" href="#/files" title="Send a file to your other devices">Files</a>
-    <input id="search" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off" maxlength="100">
+    <a id="interview-open" class="books-link" href="#/interview" title="Practice interview questions and keep your mistakes">Interview prep</a>
+    <a id="roadmap-open" class="books-link" href="/roadmap.html" title="Track solved coding problems on a roadmap">Roadmap</a>
+    <a id="agents-open" class="books-link" href="/agents.html" title="Manage MCP notebook access">Agent connections</a>
+    <input id="search" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off" maxlength="100" hidden>
     <nav id="notes" aria-label="Notes"></nav>
     <section class="timer" aria-label="Time tracker">
       <input id="task" type="text" placeholder="What are you working on?" maxlength="200" autocomplete="off" aria-label="Task description">
@@ -55,7 +68,42 @@
         <span class="bin-label">Trash</span>
       </button><div class="size-picker"><button id="size" type="button" aria-label="Text size: 14 pixels" aria-expanded="false" aria-controls="size-options">14 px ▾</button><div id="size-options" role="group" aria-label="Text size" hidden><button type="button" data-size="8">8 px</button><button type="button" data-size="10">10 px</button><button type="button" data-size="12">12 px</button><button type="button" data-size="14">14 px</button><button type="button" data-size="16">16 px</button><button type="button" data-size="18">18 px</button><button type="button" data-size="20">20 px</button><button type="button" data-size="24">24 px</button></div></div></footer>
   </aside>
-  <main data-page="notes">
+  <main id="app-main" data-page="notes">
+    <section id="interview-view" class="interview" aria-label="Interview prep">
+      <div class="interview-content">
+        <div class="interview-heading"><button id="interview-close" class="tool" type="button">‹ Notes</button><span>Practice → understand → revisit</span></div>
+        <div class="interview-intro"><span class="interview-eyebrow">A SMALL DAILY PRACTICE</span><h1>Interview prep</h1><p>Ten questions. Keep what you missed.</p></div>
+        <p id="interview-recovery" class="interview-warning" role="status" hidden></p>
+        <div id="interview-setup" class="interview-card">
+          <h2>What are we working on?</h2>
+          <p>Choose a topic for a fresh, shuffled round. You’ll get an explanation after each answer.</p>
+          <label for="interview-topic">Practice topic</label>
+          <select id="interview-topic"></select>
+          <div class="interview-details"><span>10 multiple-choice questions</span><span>About 5–10 minutes</span></div>
+          <button id="interview-start" class="tool interview-primary" type="button">Start a round →</button>
+          <div class="interview-save-hint"><strong>Your mistakes become your study notes.</strong><p>At the end, missed questions, your answers, and explanations are saved in a new notebook note. Download a Markdown file too, if you like.</p></div>
+          <p class="interview-bank">40 built-in Python 3 and C++17 questions, from fundamentals to intermediate.</p>
+        </div>
+        <div id="interview-round" hidden>
+          <div class="interview-round-meta"><span id="interview-round-topic"></span><span id="interview-step"></span></div>
+          <progress id="interview-progress" max="10" value="0" aria-label="Questions answered"></progress>
+          <form id="interview-form" class="interview-card">
+            <fieldset id="interview-choices"><legend id="interview-question" tabindex="-1"></legend><div id="interview-options"></div></fieldset>
+            <div id="interview-feedback" class="interview-feedback" role="status" hidden></div>
+            <button id="interview-check" class="tool interview-primary" type="submit" disabled>Check answer</button>
+            <button id="interview-next" class="tool interview-primary" type="button" hidden>Next question →</button>
+          </form>
+          <p class="interview-bank">Leave and come back any time. This round stays in this tab through a reload.</p>
+        </div>
+        <div id="interview-results" hidden>
+          <div class="interview-card interview-summary"><span class="interview-eyebrow">ROUND COMPLETE</span><h2 id="interview-score" tabindex="-1"></h2><p id="interview-result-message"></p></div>
+          <div class="interview-result-actions"><button id="interview-download" class="tool" type="button">Download mistakes .md</button><button id="interview-note" class="tool" type="button" hidden>Open saved note ↗</button><button id="interview-save-retry" class="tool" type="button" hidden>Retry save</button><button id="interview-again" class="tool interview-primary" type="button">New round →</button></div>
+          <p id="interview-save-status" role="status"></p>
+          <h2 id="interview-review-heading">Your review list</h2>
+          <div id="interview-mistakes"></div>
+        </div>
+      </div>
+    </section>
     <section id="report-view" class="report" hidden aria-label="Time report">
       <div class="report-head"><h2>Time report</h2><button id="close-report" class="tool">Back to notes</button></div>
       <div class="totals">
@@ -106,6 +154,7 @@
       <div class="more">
         <button id="more" class="tool" type="button" aria-label="More actions" aria-haspopup="true" aria-expanded="false" aria-controls="more-menu" title="More">⋯</button>
         <div id="more-menu" class="menu" role="group" aria-label="More actions" hidden>
+          <button id="mobile-rename" class="menu-item" type="button">Rename note</button>
           <label class="menu-item focus-item" title="Show only the note, its preview, and the timer"><input type="checkbox" id="focus-mode"> Focus mode</label>
           <label class="menu-item" title="Turn spell check on or off"><input type="checkbox" id="spellcheck" checked> Spell check</label>
           <details class="menu-cheat">

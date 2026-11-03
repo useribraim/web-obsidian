@@ -62,7 +62,8 @@ let savingPromise = null;
 let blockedMessage = '';
 let renaming = false;
 let lastClick = { id: null, time: 0 };
-let view = window.matchMedia('(max-width: 600px)').matches ? 'edit' : 'split';
+const phoneLayout = window.matchMedia('(max-width: 600px)');
+let view = phoneLayout.matches ? 'edit' : 'split';
 
 logout.onclick = async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
@@ -153,6 +154,34 @@ function renderList(lines) {
   while (open.length) html += '</li></' + open.pop().tag + '>';
   return html;
 }
+// Split only unescaped pipes; optional outer pipes are not cells. Keep escaped
+// pipes intact until after splitting so they can be displayed inside a cell.
+function tableCells(line) {
+  const cells = [''];
+  const text = line.trim();
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '\\' && i + 1 < text.length) {
+      cells[cells.length - 1] += text[i] + text[++i];
+    } else if (text[i] === '|') cells.push('');
+    else cells[cells.length - 1] += text[i];
+  }
+  if (cells.length < 2) return null;
+  if (cells[0] === '') cells.shift();
+  if (cells[cells.length - 1] === '') cells.pop();
+  return cells.map(cell => cell.trim());
+}
+function tableHeader(lines, index) {
+  const header = tableCells(lines[index] || '');
+  const divider = tableCells(lines[index + 1] || '');
+  if (!header || !divider || header.length !== divider.length ||
+      !divider.every(cell => /^:?-{3,}:?$/.test(cell))) return null;
+  return { header, align: divider.map(cell => cell.startsWith(':') && cell.endsWith(':') ? 'center' : cell.endsWith(':') ? 'right' : 'left') };
+}
+function renderTableRow(cells, align, tag) {
+  return '<tr>' + align.map((alignment, index) => '<' + tag +
+    (tag === 'th' ? ' scope="col"' : '') + ' class="table-' + alignment + '">' +
+    renderInline((cells[index] || '').replace(/\\\|/g, '|')) + '</' + tag + '>').join('') + '</tr>';
+}
 // Block-level Markdown. A line-based scan keeps headings, lists, quotes and
 // fenced code from interfering with one another.
 function renderMarkdown(source) {
@@ -198,10 +227,25 @@ function renderMarkdown(source) {
       html += renderList(items);
       continue;
     }
+    const table = tableHeader(lines, i);
+    if (table) {
+      html += '<div class="table-scroll" role="region" aria-label="Table" tabindex="0"><table><thead>' +
+        renderTableRow(table.header, table.align, 'th') + '</thead><tbody>';
+      i += 2;
+      while (i < lines.length && lines[i].trim() !== '' && !isHeading(lines[i]) && !isList(lines[i]) &&
+             !/^\s*>/.test(lines[i]) && !/^```/.test(lines[i].trim())) {
+        const cells = tableCells(lines[i]);
+        if (!cells) break;
+        html += renderTableRow(cells, table.align, 'td');
+        i += 1;
+      }
+      html += '</tbody></table></div>';
+      continue;
+    }
     if (line.trim() === '') { i += 1; continue; }
     const paragraph = [];
     while (i < lines.length && lines[i].trim() !== '' && !isHeading(lines[i]) && !isList(lines[i]) && !imageLine(lines[i]) &&
-           !/^\s*>/.test(lines[i]) && !/^```\w*\s*$/.test(lines[i].trim())) {
+           !/^\s*>/.test(lines[i]) && !/^```\w*\s*$/.test(lines[i].trim()) && !tableHeader(lines, i)) {
       paragraph.push(renderInline(lines[i]));
       i += 1;
     }
@@ -395,6 +439,19 @@ const foldToggle = document.querySelector('#fold-toggle');
 function noteText() { return foldedSource + content.value; }
 // Offset of the first heading of the oldest day that stays open, or -1 if there is no earlier text.
 function openFromOffset(text) {
+  const headings = sourceHeadings(text);
+  const dates = NoteWeeks.assignDates(headings.map(heading => heading.text));
+  const last = NoteWeeks.lastDay(dates);
+  if (!last) return -1;
+  const cutoff = NoteWeeks.shownFromDay(last);
+  // With no earlier week there is nothing to fold, so nothing is hidden.
+  if (!dates.some(date => date && date.getTime() < cutoff)) return -1;
+  for (let index = 0; index < dates.length; index += 1) {
+    if (dates[index] && dates[index].getTime() >= cutoff) return headings[index].offset;
+  }
+  return -1;
+}
+function sourceHeadings(text) {
   const headings = [];
   let offset = 0;
   let fenced = false;
@@ -408,16 +465,54 @@ function openFromOffset(text) {
     }
     offset += line.length + 1;
   }
-  const dates = NoteWeeks.assignDates(headings.map(heading => heading.text));
-  const last = NoteWeeks.lastDay(dates);
-  if (!last) return -1;
-  const cutoff = NoteWeeks.shownFromDay(last);
-  // With no earlier week there is nothing to fold, so nothing is hidden.
-  if (!dates.some(date => date && date.getTime() < cutoff)) return -1;
-  for (let index = 0; index < dates.length; index += 1) {
-    if (dates[index] && dates[index].getTime() >= cutoff) return headings[index].offset;
+  return headings;
+}
+// Choose the newest date, not simply the last heading: some notes run newest first.
+function latestDayIndex(texts) {
+  const dates = NoteWeeks.assignDates(texts);
+  let latest = -1;
+  dates.forEach((date, index) => {
+    if (date && (latest === -1 || date >= dates[latest])) latest = index;
+  });
+  return latest;
+}
+// Measure wrapped source lines using the textarea's actual font and usable width.
+// No focus is needed, so opening a note on a phone does not summon its keyboard.
+function sourceOffsetTop(offset) {
+  const style = getComputedStyle(content);
+  const mirror = document.createElement('div');
+  for (const property of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'tabSize', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'wordBreak', 'overflowWrap']) {
+    mirror.style[property] = style[property];
   }
-  return -1;
+  Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', pointerEvents: 'none', boxSizing: 'border-box', width: content.clientWidth + 'px', whiteSpace: 'pre-wrap' });
+  mirror.textContent = content.value.slice(0, offset);
+  const marker = document.createElement('span');
+  Object.assign(marker.style, { display: 'inline-block', height: style.lineHeight, verticalAlign: 'top' });
+  marker.textContent = '\u200b';
+  mirror.append(marker);
+  document.body.append(mirror);
+  const top = marker.getBoundingClientRect().top - mirror.getBoundingClientRect().top;
+  mirror.remove();
+  return top;
+}
+function scrollToLatestDay() {
+  const headings = sourceHeadings(noteText());
+  const latest = latestDayIndex(headings.map(heading => heading.text));
+  const offset = latest === -1 ? 0 : Math.max(0, headings[latest].offset - foldedSource.length);
+  content.setSelectionRange(offset, offset);
+  // Each pane has different wrapping and markup. Position them independently,
+  // without the proportional split-view scroll follower undoing either jump.
+  for (const pane of [content, preview]) movedByCode.add(pane);
+  if (content.clientWidth) content.scrollTop = latest === -1 ? 0 : sourceOffsetTop(offset);
+  if (preview.clientWidth) {
+    const shown = [...preview.children].filter(node => /^H[1-6]$/.test(node.tagName));
+    const index = latestDayIndex(shown.map(node => node.textContent));
+    preview.scrollTop = index === -1 ? 0 : preview.scrollTop + shown[index].getBoundingClientRect().top - preview.getBoundingClientRect().top;
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    movedByCode.delete(content);
+    movedByCode.delete(preview);
+  }));
 }
 function updateFoldNote() {
   const hidden = foldedSource ? foldedSource.split('\n').length - 1 : 0;
@@ -573,11 +668,13 @@ function updateControls() {
   purgeButton.disabled = busy;
   newButton.hidden = mode === 'trash';
   newButton.disabled = busy;
+  document.querySelector('#mobile-rename').disabled = busy || !current || mode !== 'active';
   const readOnly = mode === 'trash' || trashed;
   imageButton.hidden = readOnly;
   imageButton.disabled = busy;
   trashLabel.textContent = mode === 'trash' ? 'Back' : 'Trash';
   trashButton.title = mode === 'trash' ? 'Back to notes' : 'Trash';
+  trashButton.setAttribute('aria-label', trashButton.title);
 }
 // The last-edited date under each title: a time today, "Yesterday", or the day.
 function noteDate(iso) {
@@ -620,6 +717,7 @@ async function refreshBin() {
   } catch {}
 }
 function render() {
+  document.querySelector('main').dataset.noteTitle = current?.title || (mode === 'trash' ? 'Trash' : 'New note');
   if (renaming) return;
   list.replaceChildren();
   const shown = mode === 'active' && searchQuery ? searchResults : notes;
@@ -684,6 +782,14 @@ async function startRename(id) {
     else if (event.key === 'Escape') { event.preventDefault(); finish(false); }
   };
 }
+document.querySelector('#mobile-rename').addEventListener('click', () => {
+  if (busy || !current || mode !== 'active') return;
+  searchBox.value = '';
+  searchQuery = '';
+  render();
+  window.mobileNavigation?.open();
+  startRename(current.id);
+});
 async function renameNote(id, newTitle) {
   try {
     const note = await api('/' + id);
@@ -728,6 +834,12 @@ function show(note) {
   blockedMessage = '';
   updateControls();
   render();
+  document.dispatchEvent(new Event('note-shown'));
+  // Wait for the restored note layout, and ignore a stale jump after switching.
+  const text = noteText();
+  requestAnimationFrame(() => {
+    if (current === note && noteText() === text) scrollToLatestDay();
+  });
 }
 function schedule() {
   clearTimeout(timer);
@@ -795,22 +907,34 @@ async function doSave() {
   updateControls();
   render();
 }
-async function openNote(id) {
+async function openNote(id, { active = false } = {}) {
   if (busy) return;
   if (!(await flush())) return;
   setBusy(true);
   message('Loading…');
   try {
+    if (active && mode === 'trash') {
+      notes = await api('');
+      mode = 'active';
+    }
     show(await api('/' + id));
     message(current.deleted_at ? 'In trash — restore it to edit.' : 'Saved');
   } catch (error) { message(error.message, true); }
   finally { setBusy(false); }
 }
+document.addEventListener('interview-note-saved', event => {
+  if (mode !== 'active') return;
+  const note = event.detail;
+  notes = [note, ...notes.filter(item => item.id !== note.id)];
+  render();
+});
 newButton.onclick = async () => {
   if (busy || mode === 'trash') return;
   if (!(await flush())) return;
   resetDraft();
   message('New note');
+  if (phoneLayout.matches) { view = 'edit'; applyView(); }
+  window.mobileNavigation?.close(false);
   content.focus();
 };
 trashButton.onclick = async () => {
@@ -947,9 +1071,13 @@ try {
   if (saved && ['edit', 'live', 'split', 'preview'].includes(saved)) view = saved;
 } catch {}
 function applyView() {
-  editor.dataset.view = view;
-  for (const button of viewButtons) button.classList.toggle('active', button.dataset.view === view);
-  if (view !== 'edit') renderPreview();
+  const shown = phoneLayout.matches && view === 'split' ? 'edit' : view;
+  editor.dataset.view = shown;
+  for (const button of viewButtons) {
+    button.classList.toggle('active', button.dataset.view === shown);
+    button.setAttribute('aria-pressed', String(button.dataset.view === shown));
+  }
+  if (shown !== 'edit') renderPreview();
 }
 for (const button of viewButtons) {
   button.onclick = () => {
@@ -966,7 +1094,7 @@ const focusMode = document.querySelector('#focus-mode');
 try { focusMode.checked = localStorage.getItem(FOCUS_KEY) === '1'; } catch {}
 function applyFocus() {
   document.body.classList.toggle('focus', focusMode.checked);
-  if (focusMode.checked) {
+  if (focusMode.checked && !phoneLayout.matches) {
     editor.dataset.view = 'split';
     renderPreview();
   } else {
@@ -979,6 +1107,7 @@ focusMode.addEventListener('change', () => {
   try { localStorage.setItem(FOCUS_KEY, focusMode.checked ? '1' : '0'); } catch {}
 });
 applyFocus();
+phoneLayout.addEventListener('change', applyFocus);
 // Split or join the source again, keeping the caret on the same text.
 function resplitSource() {
   const folded = foldedSource.length;
@@ -994,6 +1123,7 @@ function resplitSource() {
   renderPreview();
 }
 function showUnraveled() {
+  unravelButton.dataset.mobileLabel = unraveled ? 'Fold earlier days' : 'Show whole note';
   unravelButton.setAttribute('aria-pressed', String(unraveled));
   unravelButton.textContent = unraveled ? '⤡' : '⤢';
   unravelButton.title = unraveled ? 'Fold the earlier weeks again' : 'Unravel: show every week and day';
@@ -1081,9 +1211,11 @@ document.querySelector('.more').addEventListener('keydown', event => {
   if (event.key === 'Escape' && !moreMenu.hidden) { event.preventDefault(); event.stopPropagation(); showMore(false, true); }
 });
 const SIZE_KEY = 'noteSize';
+const MOBILE_SIZE_KEY = 'noteMobileSize';
+const sizeKey = () => phoneLayout.matches ? MOBILE_SIZE_KEY : SIZE_KEY;
 const sizeOptions = document.querySelector('#size-options');
 const sizeChoices = [...sizeOptions.querySelectorAll('[data-size]')];
-let noteSize = '14';
+let noteSize = phoneLayout.matches ? '16' : '14';
 function applySize() {
   document.documentElement.style.setProperty('--note-size', noteSize + 'px');
   size.textContent = noteSize + ' px ▾';
@@ -1096,18 +1228,23 @@ function showSizeOptions(open, restoreFocus = false) {
   if (open) sizeChoices.find(choice => choice.dataset.size === noteSize).focus();
   else if (restoreFocus) size.focus();
 }
-try {
-  const saved = localStorage.getItem(SIZE_KEY);
-  if (sizeChoices.some(choice => choice.dataset.size === saved)) noteSize = saved;
-} catch {}
-applySize();
+function loadSize() {
+  noteSize = phoneLayout.matches ? '16' : '14';
+  try {
+    const saved = localStorage.getItem(sizeKey());
+    if (sizeChoices.some(choice => choice.dataset.size === saved)) noteSize = saved;
+  } catch {}
+  applySize();
+}
+loadSize();
+phoneLayout.addEventListener('change', loadSize);
 renderPreview();
 size.onclick = () => showSizeOptions(sizeOptions.hidden);
 for (const choice of sizeChoices) {
   choice.onclick = () => {
     noteSize = choice.dataset.size;
     applySize();
-    try { localStorage.setItem(SIZE_KEY, noteSize); } catch {}
+    try { localStorage.setItem(sizeKey(), noteSize); } catch {}
     showSizeOptions(false, true);
   };
 }
@@ -1137,7 +1274,7 @@ async function init() {
   } catch (error) { setBusy(false); message(error.message, true); }
 }
 // Books read the address after the first note has loaded, so that a link to a book is not undone.
-init().then(() => window.routeBooks?.());
+init().then(() => { window.notesReady = true; window.routeBooks?.(); });
 
 // Images live separately from note text. Insert links only after upload succeeds.
 const MAX_IMAGE_BYTES = 1_500_000;
@@ -1590,6 +1727,7 @@ function renderReport() {
   }
 }
 function showReport(open) {
+  window.closeInterview?.();
   window.closeBooks?.();
   window.closeFiles?.();
   main.dataset.page = open ? 'report' : 'notes';
@@ -1624,29 +1762,19 @@ async function heartbeat() {
 setInterval(() => { heartbeat().catch(() => {}); }, HEARTBEAT_INTERVAL);
 loadEntries().catch(error => message(error.message, true));
 
-// On a phone the on-screen keyboard covers the bottom of the page, and the page does
-// not shrink to fit. Size the layout to what is visible, and give the editor the whole
-// screen while you type, so the line you are writing stays in view.
+// Let the textarea manage its own caret and scrolling. Only size the workspace
+// to the visible viewport; scrolling the document fights Android's keyboard.
 (() => {
   const viewport = window.visualViewport;
   if (!viewport) return;
   const fit = () => {
+    if (!phoneLayout.matches || viewport.scale !== 1) return;
     document.documentElement.style.setProperty('--vvh', viewport.height + 'px');
-    if (window.scrollY || viewport.offsetTop) window.scrollTo(0, 0);
-    if (document.activeElement === content) content.scrollIntoView({ block: 'nearest' });
   };
   viewport.addEventListener('resize', fit);
-  viewport.addEventListener('scroll', fit);
-  content.addEventListener('focus', () => { document.body.classList.add('typing'); setTimeout(fit, 250); });
-  content.addEventListener('blur', () => document.body.classList.remove('typing'));
-  // The caret can move without a key press, for example by a tap or a long press.
-  document.addEventListener('selectionchange', () => {
-    if (document.activeElement !== content || content.selectionStart !== content.selectionEnd) return;
-    const line = content.value.slice(0, content.selectionStart).split('\n').length;
-    const height = parseFloat(getComputedStyle(content).lineHeight) || 24;
-    const top = (line - 1) * height;
-    if (top < content.scrollTop) content.scrollTop = top;
-    else if (top + height > content.scrollTop + content.clientHeight - height) content.scrollTop = top + height - content.clientHeight + height;
+  phoneLayout.addEventListener('change', () => {
+    document.documentElement.style.removeProperty('--vvh');
+    fit();
   });
   fit();
 })();
