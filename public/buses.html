@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191919">
+  <title>Dublin buses - Notes</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/buses.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/buses.js" type="module"></script>
+</head>
+<body class="buses-page">
+  <div id="bus-map" aria-label="Map of live Dublin buses"></div>
+  <div class="bus-panel">
+    <a class="bus-back" href="/">‹ Notes</a>
+    <h1>Dublin buses</h1>
+    <p id="bus-status" class="bus-status" role="status" aria-live="polite">Loading…</p>
+    <div class="bus-controls">
+      <label class="bus-sr" for="bus-route">Route</label>
+      <input id="bus-route" type="search" placeholder="Route, such as 46A" autocomplete="off" spellcheck="false" maxlength="12">
+      <label class="bus-sr" for="bus-operator">Operator</label>
+      <select id="bus-operator"></select>
+    </div>
+    <p class="bus-credit">Bus data: <a href="https://www.nationaltransport.ie" target="_blank" rel="noopener">National Transport Authority</a> (CC BY 4.0), provided “as is”. The NTA is not responsible for errors or inaccuracies.</p>
+  </div>
+</body>
+</html>

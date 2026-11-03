@@ -2,6 +2,7 @@ import { authenticateMcp, mcpAuthResponse } from './mcp-auth.js';
 import { mcpResponse } from './mcp.js';
 import { interviewResponse } from './interview-api.js';
 import { roadmapResponse } from './roadmap-api.js';
+import { busResponse } from './bus-api.js';
 
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store' },
@@ -573,6 +574,8 @@ export default {
       }
       const interview = await interviewResponse(request, env, url);
       if (interview) return interview;
+      const buses = await busResponse(request, env, url);
+      if (buses) return buses;
       const roadmap = await roadmapResponse(request, env, url);
       if (roadmap) return roadmap;
       const image = await imageResponse(request, env, url);
