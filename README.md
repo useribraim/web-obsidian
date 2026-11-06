@@ -240,6 +240,13 @@ refresh, and replay revocation against an isolated local Wrangler database.
 - The page sends a heartbeat every 5 minutes. If the laptop sleeps and the
   heartbeats stop for 15 minutes, the entry ends at the last one.
 
+## Bus lab
+
+`lab/` is a hands-on workspace for writing the live bus map from scratch, stage
+by stage, separate from the notebook. It is not deployed and the notebook does
+not link it. Run `npm run lab` and open http://127.0.0.1:8788/. See
+[lab/README.md](lab/README.md) and [lab/PLAN.md](lab/PLAN.md).
+
 ## Run locally
 
 ```sh

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared Notes — Minimal POC v0.3</title>
+<style>
+/* v0.3 — minimized + polished. Standalone mock, no backend. */
+:root {
+  --paper: #fff;
+  --ink: #1a1a1a;
+  --gray: #6b6b6b;
+  --line: #e6e6e6;
+  --wash: #fafafa;
+  --accent: #000;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+/* Header — kept from USG but quiet */
+header { padding: 28px 0 0; }
+.logotype { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
+.logotype span { color: var(--gray); font-weight: 400; }
+.colorbar { height: 5px; margin-top: 10px; border-radius: 3px;
+  background: linear-gradient(to right,#000 0 8%,#e7040f 8% 22%,#ffb700 22% 38%,#00794c 38% 54%,#00449e 54% 70%,#7643b9 70% 90%,#eee 90% 100%);
+}
+nav { display: flex; gap: 4px; margin-top: 14px; border-bottom: 1px solid var(--line); padding-bottom: 0; }
+nav button { border: 0; background: none; padding: 8px 12px; font-size: 13px; color: var(--gray); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav button.active { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
+.poc-note { font-family: var(--mono); font-size: 11px; color: var(--gray); margin-top: 10px; }
+/* Sections */
+h2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray); margin: 36px 0 10px; }
+/* Notes list — was a 6-column table, now 2 lines */
+#notes { border-top: 1px solid var(--line); }
+.note-row { display: flex; justify-content: space-between; gap: 12px; width: 100%; text-align: left;
+  padding: 10px 8px; border: 0; border-bottom: 1px solid var(--line); background: none; cursor: pointer; font-size: 14px; font-weight: 400; }
+.note-row:hover { background: var(--wash); }
+.note-row.active { background: var(--wash); box-shadow: inset 2px 0 0 var(--ink); }
+.note-row .date { font-family: var(--mono); font-size: 12px; color: var(--gray); white-space: nowrap; }
+/* Editor */
+.tools { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.tools .spacer { flex: 1; }
+.btn { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--ink); }
+.btn:hover { background: var(--wash); border-color: #d0d0d0; }
+.btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn.primary:hover { background: #333; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
+.seg .btn { border: 0; border-radius: 0; padding: 6px 14px; color: var(--gray); }
+.seg .btn + .btn { border-left: 1px solid var(--line); }
+.seg .btn:hover { background: var(--wash); color: var(--ink); }
+.seg .btn.active { background: var(--ink); color: #fff; }
+.status { font-family: var(--mono); font-size: 11px; color: var(--gray); margin-bottom: 8px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.grid[data-view="edit"] { grid-template-columns: 1fr; }
+.grid[data-view="edit"] #preview-wrap { display: none; }
+.grid[data-view="preview"] { grid-template-columns: 1fr; }
+.grid[data-view="preview"] #source-wrap { display: none; }
+.pane-label { font-size: 11px; color: var(--gray); padding: 6px 10px; background: var(--wash); border-bottom: 1px solid var(--line); font-family: var(--mono); }
+#source { width: 100%; min-height: 200px; border: 0; outline: none; resize: vertical; padding: 12px; font-family: var(--mono); font-size: 13.5px; line-height: 1.65; }
+#preview { padding: 12px 14px; min-height: 200px; border-left: 1px solid var(--line); line-height: 1.6; }
+.grid[data-view="edit"] #preview, .grid[data-view="preview"] #preview { border-left: 0; }
+#preview p { margin: 0 0 0.7em; }
+#preview h3 { margin: 0 0 10px; font-size: 19px; line-height: 1.3; }
+#preview input[type="checkbox"] { width: 14px; height: 14px; margin: 0 7px 0 0; vertical-align: -2px; accent-color: #000; }
+#preview pre { background: #111; color: #eee; padding: 8px 10px; border-radius: 6px; overflow: auto; }
+#preview code { font-family: var(--mono); font-size: 0.9em; background: #f0f0f0; padding: 0 4px; border-radius: 4px; }
+#preview pre code { background: none; color: inherit; padding: 0; }
+/* Timer — single row */
+.timer { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--wash); }
+.timer input { flex: 1; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 14px; background: #fff; outline: none; min-width: 0; }
+.timer input:focus { border-color: #999; }
+#clock { font-family: var(--mono); font-size: 14px; color: var(--ink); min-width: 64px; text-align: right; }
+footer { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 11px; color: var(--gray); display: flex; justify-content: space-between; }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } #preview { border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logotype">Shared Notes <span>— Office</span></div>
+    <div class="colorbar"></div>
+    <nav>
+      <button class="active" data-nav="notes">Notes</button>
+      <button data-nav="trash">Trash</button>
+      <button data-nav="time">Time</button>
+    </nav>
+    <div class="poc-note">POC v0.3 · mock only · no backend</div>
+  </header>
+
+  <main>
+    <h2>Notes</h2>
+    <div id="notes"></div>
+
+    <h2>Editor</h2>
+    <div class="tools">
+      <span class="seg" role="group" aria-label="View">
+        <button class="btn" data-view="edit">Edit</button>
+        <button class="btn active" data-view="split">Split</button>
+        <button class="btn" data-view="preview">Preview</button>
+      </span>
+      <span class="spacer"></span>
+      <button class="btn primary" id="save">Save</button>
+    </div>
+    <div class="status"><span id="status">Saved</span> · <span id="ver">v7</span></div>
+    <div class="grid" id="grid" data-view="split">
+      <div id="source-wrap">
+        <div class="pane-label">Markdown</div>
+        <textarea id="source"></textarea>
+      </div>
+      <div id="preview-wrap">
+        <div class="pane-label">Preview</div>
+        <div id="preview"></div>
+      </div>
+    </div>
+
+    <h2>Time</h2>
+    <div class="timer">
+      <input id="task" maxlength="200" placeholder="What are you working on?">
+      <span id="clock">0:00:00</span>
+      <button class="btn" id="toggle">Start</button>
+    </div>
+  </main>
+
+  <footer><span>© 2026 Shared Notes POC</span><span>v0.3.0</span></footer>
+</div>
+
+<script>
+(function(){
+  var NOTES = [
+    {id:'a1', title:'Cut list — cabinet', date:'Sep 19', content:'# Cut list\n\n- [ ] Rip stiles 34x72\n- [x] Crosscut rails\n\n**Wait** on shelves until carcass is squared.'},
+    {id:'b2', title:'Site measurements', date:'Sep 18', content:'# Site\n\nNorth wall 142.5in, south 142.625in. *Verify twice.*'},
+    {id:'c3', title:'Type notes', date:'Sep 12', content:'# Type\n\nMono at 13px. **Dense, not sparse.**'}
+  ];
+  var current = NOTES[0], dirty = false;
+  var list = document.getElementById('notes'),
+      src = document.getElementById('source'),
+      prev = document.getElementById('preview'),
+      grid = document.getElementById('grid');
+
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function inline(s){ s=esc(s); s=s.replace(/`([^`]+)`/g,'<code>$1</code>'); s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>'); s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>'); return s; }
+  function render(t){
+    return t.split('\n').map(function(line){
+      var h=/^(#{1,3})\s+(.*)$/.exec(line);
+      if(h) return '<h3>'+inline(h[2])+'</h3>';
+      var m=/^\s*[-*+]\s+(.*)$/.exec(line);
+      if(m){ var task=/^\[([ xX])\]\s*(.*)$/.exec(m[1]);
+        if(task) return '<p><input type="checkbox" disabled'+(task[1]!==' '?' checked':'')+'> '+inline(task[2])+'</p>';
+        return '<p>· '+inline(m[1])+'</p>'; }
+      if(line.trim()==='') return '';
+      return '<p>'+inline(line)+'</p>';
+    }).join('');
+  }
+  function draw(){ prev.innerHTML = render(src.value); }
+  function setStatus(){ document.getElementById('status').textContent = dirty ? 'Unsaved' : 'Saved'; }
+  function renderList(){
+    list.innerHTML='';
+    NOTES.forEach(function(n){
+      var b=document.createElement('button');
+      b.className='note-row'+(n.id===current.id?' active':'');
+      b.innerHTML='<span></span><span class="date"></span>';
+      b.children[0].textContent=n.title; b.children[1].textContent=n.date;
+      b.onclick=function(){ current=n; src.value=n.content; dirty=false; setStatus(); draw(); renderList(); };
+      list.appendChild(b);
+    });
+  }
+  src.addEventListener('input', function(){ dirty=true; setStatus(); draw(); });
+  document.getElementById('save').onclick=function(){ dirty=false; setStatus(); };
+  document.querySelectorAll('.seg [data-view]').forEach(function(b){ b.onclick=function(){
+    document.querySelectorAll('.seg [data-view]').forEach(function(x){x.classList.remove('active');});
+    b.classList.add('active');
+    grid.dataset.view=b.dataset.view; draw();
+  }; });
+  document.querySelectorAll('nav [data-nav]').forEach(function(b){
+    b.onclick=function(){
+      document.querySelectorAll('nav [data-nav]').forEach(function(x){x.classList.remove('active');});
+      b.classList.add('active');
+      document.getElementById('status').textContent = b.dataset.nav==='trash' ? 'Trash is empty (mock)' : 'Saved';
+    };
+  });
+  var running=false, t0=0, acc=0, tick=null, clock=document.getElementById('clock'), tog=document.getElementById('toggle');
+  function fmt(ms){ var s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return h+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'); }
+  tog.onclick=function(){ running=!running; tog.textContent=running?'Stop':'Start';
+    if(running){ t0=Date.now(); tick=setInterval(function(){ clock.textContent=fmt(acc+Date.now()-t0); },1000); }
+    else { acc+=Date.now()-t0; clearInterval(tick); } };
+  src.value=current.content; draw(); renderList();
+})();
+</script>
+</body>
+</html>

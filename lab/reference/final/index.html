@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bus lab — finished reference</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="./style.css">
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <div id="map" aria-label="Map of live Dublin buses"></div>
+  <div class="panel">
+    <a class="back" href="/">‹ Lab guide</a>
+    <h1>Dublin buses</h1>
+    <p id="status" class="status" role="status" aria-live="polite">Loading…</p>
+    <div class="controls">
+      <label class="sr" for="route">Route</label>
+      <input id="route" type="search" placeholder="Route, such as 46A" autocomplete="off" spellcheck="false" maxlength="12">
+      <label class="sr" for="operator">Operator</label>
+      <select id="operator"></select>
+    </div>
+    <p class="credit">Bus data: <a href="https://www.nationaltransport.ie" target="_blank" rel="noopener">National Transport Authority</a> (CC BY 4.0). Map: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>.</p>
+  </div>
+</body>
+</html>

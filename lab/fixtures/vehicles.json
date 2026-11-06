@@ -1,0 +1,117 @@
+{
+  "updated": 1793907138155,
+  "buses": [
+    {
+      "id": "fixture-bus-1",
+      "route": "1 1 e a",
+      "lat": 53.3498,
+      "lon": -6.2603,
+      "bearing": 90,
+      "time": 1793907138
+    },
+    {
+      "id": "fixture-bus-2",
+      "route": "1 39 c a",
+      "lat": 53.3441,
+      "lon": -6.2674,
+      "bearing": 45,
+      "time": 1793907131
+    },
+    {
+      "id": "fixture-bus-3",
+      "route": "1 16 c a",
+      "lat": 53.3567,
+      "lon": -6.2436,
+      "bearing": 180,
+      "time": 1793907124
+    },
+    {
+      "id": "fixture-bus-4",
+      "route": "1 15 c a",
+      "lat": 53.3412,
+      "lon": -6.2495,
+      "bearing": 270,
+      "time": 1793907117
+    },
+    {
+      "id": "fixture-bus-5",
+      "route": "1 7 c a",
+      "lat": 53.3638,
+      "lon": -6.2499,
+      "bearing": 0,
+      "time": 1793907110
+    },
+    {
+      "id": "fixture-bus-6",
+      "route": "1 4 c a",
+      "lat": 53.3382,
+      "lon": -6.288,
+      "bearing": 120,
+      "time": 1793907103
+    },
+    {
+      "id": "fixture-bus-7",
+      "route": "1 11 c a",
+      "lat": 53.3465,
+      "lon": -6.2318,
+      "bearing": 220,
+      "time": 1793907096
+    },
+    {
+      "id": "fixture-bus-8",
+      "route": "1 116 c a",
+      "lat": 53.368,
+      "lon": -6.27,
+      "bearing": 300,
+      "time": 1793907089
+    },
+    {
+      "id": "fixture-bus-9",
+      "route": "03C 120 e a",
+      "lat": 53.353,
+      "lon": -6.31,
+      "bearing": 10,
+      "time": 1793907082
+    },
+    {
+      "id": "fixture-bus-10",
+      "route": "03C 120A e a",
+      "lat": 53.372,
+      "lon": -6.215,
+      "bearing": 150,
+      "time": 1793907075
+    },
+    {
+      "id": "fixture-bus-11",
+      "route": "03C 120B e a",
+      "lat": 53.322,
+      "lon": -6.265,
+      "bearing": 80,
+      "time": 1793907068
+    },
+    {
+      "id": "fixture-bus-12",
+      "route": "1 1 e a",
+      "lat": 53.312,
+      "lon": -6.22,
+      "bearing": 200,
+      "time": 1793907061
+    },
+    {
+      "id": "fixture-bus-13",
+      "route": "1 39 c a",
+      "lat": 53.3605,
+      "lon": -6.2905,
+      "bearing": 330,
+      "time": 1793907054
+    },
+    {
+      "id": "fixture-bus-14",
+      "route": "1 16 c a",
+      "lat": 53.347,
+      "lon": -6.205,
+      "bearing": 60,
+      "time": 1793907047
+    }
+  ]
+}

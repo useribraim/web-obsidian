@@ -43,3 +43,18 @@ test('a word close to a short month name is not a month', () => {
     assert.equal(NoteWeeks.parseDay(heading, today), null, heading);
   }
 });
+
+
+test('journal dates stay in September when opened in November or December', () => {
+  for (const clock of [new Date(2026, 10, 6), new Date(2026, 10, 10), new Date(2026, 11, 1)]) {
+    const dates = NoteWeeks.assignDates(['9/11', '9/15', '3 november', '5 th nov', '6 th of nov'], clock);
+    assert.deepEqual(dates.map(day), [new Date(2026, 8, 11), new Date(2026, 8, 15), new Date(2026, 10, 3), new Date(2026, 10, 5), new Date(2026, 10, 6)].map(day));
+  }
+});
+
+test('named dates accept spaced ordinal suffixes and of', () => {
+  for (const heading of ['6th nov', '6 th nov', '6th of nov', '6 th of nov', 'Friday 6 th of November 2026']) {
+    assert.equal(day(NoteWeeks.parseDay(heading, today)), day(new Date(2026, 10, 6)), heading);
+  }
+  assert.equal(NoteWeeks.parseDay('6 things', today), null);
+});

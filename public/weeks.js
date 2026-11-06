@@ -35,7 +35,7 @@
   ];
   RUSSIAN_MONTHS.forEach((names, month) => names.forEach(name => { MONTHS[name] = month; }));
   const WEEKDAY = '(?:(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\\.?,?\\s+)?';
-  const DAY_MONTH = new RegExp('^' + WEEKDAY + '(\\d{1,2})(?:st|nd|rd|th)?\\s+([a-zа-яё]{3,10})\\.?(?:,?\\s+(\\d{4}))?(?![\\wа-яё])', 'i');
+  const DAY_MONTH = new RegExp('^' + WEEKDAY + '(\\d{1,2})(?:\\s*(?:st|nd|rd|th))?\\s+(?:of\\s+)?([a-zа-яё]{3,10})\\.?(?:,?\\s+(\\d{4}))?(?![\\wа-яё])', 'i');
   const MONTH_DAY = new RegExp('^' + WEEKDAY + '([a-zа-яё]{3,10})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?(?![\\wа-яё])', 'i');
   const ISO_DAY = /^(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
   const SLASH_DAY = /^(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?(?!\d)/;
@@ -126,8 +126,20 @@
   function assignDates(texts, today = new Date()) {
     let anchor = today;
     let fromHeading = false;
-    return texts.map(text => {
-      const date = parseDay(text, anchor, fromHeading);
+    return texts.map((text, index) => {
+      // The next unambiguous date is a better anchor than the clock for the
+      // first ambiguous heading in an old journal (9/11 followed by 9/15).
+      let firstAnchor = anchor;
+      const numeric = SLASH_DAY.exec(text.trim());
+      if (!fromHeading && numeric && Number(numeric[1]) <= 12 && Number(numeric[2]) <= 12) {
+        for (const next of texts.slice(index + 1)) {
+          const slash = SLASH_DAY.exec(next.trim());
+          if (slash && Number(slash[1]) <= 12 && Number(slash[2]) <= 12) continue;
+          const date = parseDay(next, anchor);
+          if (date) { firstAnchor = date; break; }
+        }
+      }
+      const date = parseDay(text, firstAnchor, fromHeading);
       if (date) { anchor = date; fromHeading = true; }
       return date;
     });
