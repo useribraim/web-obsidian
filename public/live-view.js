@@ -26,6 +26,7 @@
     let starts = [0];
     let composing = false;
     let pointerDown = false;
+    let tabMovesFocus = false;
     let activeLine = -1;
     let disabled = false;
     const undoStack = [];
@@ -382,7 +383,21 @@
 
     // The browser has nothing to undo, because every edit was cancelled above,
     // and then it sends no `historyUndo` event. The shortcuts are handled here.
+    host.addEventListener('blur', () => { tabMovesFocus = false; });
     host.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { tabMovesFocus = true; return; }
+      if (event.key !== 'Tab') tabMovesFocus = false;
+      if (event.key === 'Tab' && !event.metaKey && !event.ctrlKey && !event.altKey && !composing && !disabled && !tabMovesFocus) {
+        event.preventDefault();
+        const [start, end] = selectionRange();
+        // Use the live editor's history so indentation can be undone without
+        // resetting the note or moving focus to the hidden textarea.
+        if (!event.shiftKey) commit(start, end, '\t', 'insertTab');
+        else if (start === end && start > 0 && text[start - 1] === '\t') {
+          commit(start - 1, start, '', 'deleteTab', start - 1);
+        }
+        return;
+      }
       if (!(event.metaKey || event.ctrlKey) || event.altKey || composing) return;
       const key = event.key.toLowerCase();
       if (key === 'z' && !event.shiftKey) travel(undoStack, redoStack);
