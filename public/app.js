@@ -24,6 +24,8 @@ function syncLive() {
     window.getSelection().focusNode?.parentElement?.scrollIntoView({ block: 'nearest' });
   }
 }
+const pinnedNote = document.querySelector('#pinned-note');
+const pinnedText = document.querySelector('#pinned-text');
 const list = document.querySelector('#notes');
 const status = document.querySelector('#status');
 const newButton = document.querySelector('#new');
@@ -282,32 +284,40 @@ function renderMarkdown(source) {
 }
 // The first explicit pinned callout stays outside both scrolling panes.
 // Code examples containing the syntax must not become real reminders.
-function pinnedReminder(source) {
-  const lines = source.replace(/\r\n?/g, '\n').split('\n');
+// The end is the offset just after the callout's last line, where an edit starts.
+function pinnedReminder(source) { return pinnedReminderAt(source).text; }
+function pinnedReminderAt(source) {
+  const lines = source.split('\n');
   let fence = null;
-  for (let i = 0; i < lines.length; i += 1) {
-    const marker = /^\s*(`{3,}|~{3,})/.exec(lines[i]);
+  let offset = 0;
+  for (let i = 0; i < lines.length; offset += lines[i].length + 1, i += 1) {
+    const line = lines[i].replace(/\r$/, '');
+    const marker = /^\s*(`{3,}|~{3,})/.exec(line);
     if (fence) {
-      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(lines[i].slice(marker[0].length))) fence = null;
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(line.slice(marker[0].length))) fence = null;
       continue;
     }
     if (marker) { fence = marker[1]; continue; }
-    const pin = /^\s{0,3}>\s*\[!pin\]\s*(.*)$/i.exec(lines[i]);
+    const pin = /^\s{0,3}>\s*\[!pin\]\s*(.*)$/i.exec(line);
     if (!pin) continue;
     const text = [pin[1]];
+    let end = offset + line.length;
     while (i + 1 < lines.length && /^\s{0,3}>/.test(lines[i + 1])) {
-      text.push(lines[++i].replace(/^\s{0,3}>\s?/, ''));
+      offset += lines[i].length + 1;
+      i += 1;
+      const next = lines[i].replace(/\r$/, '');
+      text.push(next.replace(/^\s{0,3}>\s?/, ''));
+      end = offset + next.length;
     }
-    return text.join('\n').trim();
+    return { text: text.join('\n').trim(), end };
   }
-  return '';
+  return { text: '', end: -1 };
 }
 function renderPreview() {
   syncLive();
   const reminder = pinnedReminder(noteText());
-  const banner = document.querySelector('#pinned-note');
-  banner.hidden = !reminder;
-  if (banner.textContent !== reminder) banner.textContent = reminder;
+  pinnedNote.hidden = !reminder;
+  if (pinnedText.textContent !== reminder) pinnedText.textContent = reminder;
   if (editor.dataset.view === 'edit' || editor.dataset.view === 'live') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());
@@ -1188,6 +1198,31 @@ function toggleUnravel() {
   resplitSource();
 }
 unravelButton.addEventListener('click', toggleUnravel);
+// The pen on the pinned banner opens the callout in the editor, with the caret
+// at the end of its last line. Folded days unfold first if the pin is among them.
+function editPinnedReminder() {
+  if (mode !== 'active' || !current) return;
+  const { end } = pinnedReminderAt(noteText());
+  if (end < 0) return;
+  if (end < foldedSource.length) { unraveled = true; showUnraveled(); resplitSource(); }
+  if (editor.dataset.view === 'preview') document.querySelector('.view-option[data-view="edit"]').click();
+  const offset = end - foldedSource.length;
+  if (editor.dataset.view === 'live') {
+    syncLive();
+    live.focus();
+    live.setSelectionRange(offset, offset);
+    content.setSelectionRange(offset, offset);
+    window.getSelection().focusNode?.parentElement?.scrollIntoView({ block: 'center' });
+    return;
+  }
+  content.focus();
+  content.setSelectionRange(offset, offset);
+  movedByCode.add(content);
+  content.scrollTop = Math.max(0, sourceOffsetTop(offset) - content.clientHeight / 3);
+  requestAnimationFrame(() => requestAnimationFrame(() => movedByCode.delete(content)));
+}
+document.querySelector('#pinned-edit').addEventListener('click', editPinnedReminder);
+
 foldToggle.addEventListener('click', toggleUnravel);
 showUnraveled();
 // Starting a new day changes what the preview folds. The editor catches up when
