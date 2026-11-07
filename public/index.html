@@ -25,6 +25,7 @@
   <script src="/books.js" defer></script>
   <script src="/files.js" defer></script>
   <script src="/mobile.js" defer></script>
+  <script src="/daily-note.js" defer></script>
   <script src="/interview.js" type="module"></script>
 </head>
 <body>
@@ -36,6 +37,7 @@
   <div id="nav-backdrop" hidden></div>
   <aside id="sidebar" aria-label="Navigation">
     <header><span class="brand" id="sidebar-title"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button><button id="collapse" class="rail-toggle" type="button" aria-label="Collapse the sidebar (⌘\)" aria-expanded="true" title="Collapse the sidebar (⌘\)">‹</button><button id="mobile-nav-close" type="button" aria-label="Close navigation">×</button></span></header>
+    <button id="daily-open" class="books-link daily-link" type="button" aria-expanded="false" aria-controls="daily-note" title="Show or hide the daily note (⌘J)">Daily</button>
     <a id="books-open" class="books-link" href="#/books" title="Open your books">Books</a>
     <a id="files-open" class="books-link" href="#/files" title="Send a file to your other devices">Files</a>
     <a id="interview-open" class="books-link" href="#/interview" title="Practice interview questions and keep your mistakes">Interview prep</a>
@@ -174,6 +176,7 @@
               <dt><kbd>⌘L</kbd></dt><dd>Make a task, or tick it</dd>
               <dt><kbd>⌘S</kbd></dt><dd>Save now. It also saves by itself</dd>
               <dt><kbd>⌘\</kbd></dt><dd>Fold the sidebar</dd>
+              <dt><kbd>⌘J</kbd></dt><dd>Show or hide the daily note</dd>
             </dl>
           </details>
           <button id="delete" class="menu-item danger" type="button">Delete</button>
@@ -189,6 +192,12 @@
     </section>
     <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
   </main>
+  <section id="daily-note" class="daily-note" aria-label="Daily note" hidden>
+    <div class="daily-head"><h2>Daily</h2><span id="daily-count" aria-live="polite"></span><button id="daily-close" type="button" aria-label="Hide the daily note" title="Hide (⌘J)">×</button></div>
+    <ul id="daily-items"></ul>
+    <p id="daily-status" role="status" hidden></p>
+    <form id="daily-form"><input id="daily-input" type="text" placeholder="Add a daily task" maxlength="200" autocomplete="off" aria-label="New daily task"></form>
+  </section>
   <dialog id="image-viewer" aria-label="Image preview"><button id="close-image" type="button" aria-label="Close image preview">Close ×</button><img id="enlarged-image" alt=""><p id="image-caption"></p></dialog>
 </body>
 </html>

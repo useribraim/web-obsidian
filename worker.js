@@ -3,6 +3,7 @@ import { mcpResponse } from './mcp.js';
 import { interviewResponse } from './interview-api.js';
 import { roadmapResponse } from './roadmap-api.js';
 import { busResponse } from './bus-api.js';
+import { dailyResponse } from './daily-api.js';
 
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store' },
@@ -576,6 +577,8 @@ export default {
       if (interview) return interview;
       const buses = await busResponse(request, env, url);
       if (buses) return buses;
+      const daily = await dailyResponse(request, env, url);
+      if (daily) return daily;
       const roadmap = await roadmapResponse(request, env, url);
       if (roadmap) return roadmap;
       const image = await imageResponse(request, env, url);

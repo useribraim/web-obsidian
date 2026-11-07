@@ -64,6 +64,13 @@ jobs:
           wranglerVersion: "4"
           command: d1 execute ibraim-obsidian-notes --remote --file migrations/0009_add_roadmap.sql
 
+      - name: Apply the daily list migration
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4"
+          command: d1 execute ibraim-obsidian-notes --remote --file migrations/0010_add_daily_list.sql
+
       - name: Deploy the Worker
         uses: cloudflare/wrangler-action@v3
         with:
