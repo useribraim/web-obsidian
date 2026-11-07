@@ -1,6 +1,29 @@
 const content = document.querySelector('#content');
 const preview = document.querySelector('#preview');
 const editor = document.querySelector('#editor');
+// Live view edits the rendered note, as Obsidian does: the line with the caret
+// shows its Markdown, and every other line shows the result. The textarea stays
+// the source of the note. Each edit here is copied into it, and every change to
+// it is copied back here, so saving, folding and the toolbar work unchanged.
+const live = LiveView.create(document.querySelector('#live'));
+live.addEventListener('input', () => {
+  content.value = live.value;
+  content.setSelectionRange(live.selectionStart, live.selectionEnd);
+  content.dispatchEvent(new Event('input', { bubbles: true }));
+});
+// The toolbar and the shortcuts read the selection from the textarea.
+document.addEventListener('selectionchange', event => {
+  if (event.target !== document || document.activeElement !== live) return;
+  content.setSelectionRange(live.selectionStart, live.selectionEnd);
+});
+function syncLive() {
+  if (editor.dataset.view !== 'live' || live.value === content.value) return;
+  live.value = content.value;
+  if (document.activeElement === live) {
+    live.setSelectionRange(content.selectionStart, content.selectionEnd);
+    window.getSelection().focusNode?.parentElement?.scrollIntoView({ block: 'nearest' });
+  }
+}
 const list = document.querySelector('#notes');
 const status = document.querySelector('#status');
 const newButton = document.querySelector('#new');
@@ -16,7 +39,7 @@ const themePicker = document.querySelector('#theme');
 const THEME_KEY = 'noteTheme';
 function applyTheme(theme) {
   const colors = { light: '#f0eee6', dark: '#191919', forest: '#141e18', nord: '#272c36' };
-  const selected = Object.hasOwn(colors, theme) ? theme : 'light';
+  const selected = Object.hasOwn(colors, theme) ? theme : 'dark';
   document.documentElement.dataset.theme = selected;
   document.querySelector('meta[name="theme-color"]').content = colors[selected];
   themePicker.value = selected;
@@ -31,7 +54,7 @@ window.addEventListener('storage', event => {
   if (event.key === THEME_KEY || event.key === null) applyTheme(event.newValue);
 });
 const unravelButton = document.querySelector('#unravel');
-// Notes open compact: the last five days, and the rest behind a dropdown. The
+// Notes open compact: the last day, and the rest behind a dropdown. The
 // quiet button beside the view buttons unravels the whole note. It is not
 // remembered, so every visit starts compact.
 let unraveled = false;
@@ -158,6 +181,34 @@ function renderList(lines) {
   while (open.length) html += '</li></' + open.pop().tag + '>';
   return html;
 }
+// Split only unescaped pipes; optional outer pipes are not cells. Keep escaped
+// pipes intact until after splitting so they can be displayed inside a cell.
+function tableCells(line) {
+  const cells = [''];
+  const text = line.trim();
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '\\' && i + 1 < text.length) {
+      cells[cells.length - 1] += text[i] + text[++i];
+    } else if (text[i] === '|') cells.push('');
+    else cells[cells.length - 1] += text[i];
+  }
+  if (cells.length < 2) return null;
+  if (cells[0] === '') cells.shift();
+  if (cells[cells.length - 1] === '') cells.pop();
+  return cells.map(cell => cell.trim());
+}
+function tableHeader(lines, index) {
+  const header = tableCells(lines[index] || '');
+  const divider = tableCells(lines[index + 1] || '');
+  if (!header || !divider || header.length !== divider.length ||
+      !divider.every(cell => /^:?-{3,}:?$/.test(cell))) return null;
+  return { header, align: divider.map(cell => cell.startsWith(':') && cell.endsWith(':') ? 'center' : cell.endsWith(':') ? 'right' : 'left') };
+}
+function renderTableRow(cells, align, tag) {
+  return '<tr>' + align.map((alignment, index) => '<' + tag +
+    (tag === 'th' ? ' scope="col"' : '') + ' class="table-' + alignment + '">' +
+    renderInline((cells[index] || '').replace(/\\\|/g, '|')) + '</' + tag + '>').join('') + '</tr>';
+}
 // Block-level Markdown. A line-based scan keeps headings, lists, quotes and
 // fenced code from interfering with one another.
 function renderMarkdown(source) {
@@ -203,10 +254,25 @@ function renderMarkdown(source) {
       html += renderList(items);
       continue;
     }
+    const table = tableHeader(lines, i);
+    if (table) {
+      html += '<div class="table-scroll" role="region" aria-label="Table" tabindex="0"><table><thead>' +
+        renderTableRow(table.header, table.align, 'th') + '</thead><tbody>';
+      i += 2;
+      while (i < lines.length && lines[i].trim() !== '' && !isHeading(lines[i]) && !isList(lines[i]) &&
+             !/^\s*>/.test(lines[i]) && !/^```/.test(lines[i].trim())) {
+        const cells = tableCells(lines[i]);
+        if (!cells) break;
+        html += renderTableRow(cells, table.align, 'td');
+        i += 1;
+      }
+      html += '</tbody></table></div>';
+      continue;
+    }
     if (line.trim() === '') { i += 1; continue; }
     const paragraph = [];
     while (i < lines.length && lines[i].trim() !== '' && !isHeading(lines[i]) && !isList(lines[i]) && !imageLine(lines[i]) &&
-           !/^\s*>/.test(lines[i]) && !/^```\w*\s*$/.test(lines[i].trim())) {
+           !/^\s*>/.test(lines[i]) && !/^```\w*\s*$/.test(lines[i].trim()) && !tableHeader(lines, i)) {
       paragraph.push(renderInline(lines[i]));
       i += 1;
     }
@@ -237,18 +303,19 @@ function pinnedReminder(source) {
   return '';
 }
 function renderPreview() {
+  syncLive();
   const reminder = pinnedReminder(noteText());
   const banner = document.querySelector('#pinned-note');
   banner.hidden = !reminder;
   if (banner.textContent !== reminder) banner.textContent = reminder;
-  if (editor.dataset.view === 'edit') return;
+  if (editor.dataset.view === 'edit' || editor.dataset.view === 'live') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());
   if (!unraveled) foldEarlierWeeks();
 }
-// Compact mode shows the last five days of a note, and puts every earlier day in a
+// Compact mode shows the last day of a note, and puts every earlier day in a
 // dropdown, grouped by week and month. A day heading ("### 9/28") carries the date; weeks.js
-// reads it. The five days end on the last dated heading, so a note looks the same
+// reads it. The open day is the last dated heading, so a note looks the same
 // on any day. Earlier tasks that are still open are listed above the preview.
 const WEEK_KEY = 'noteWeekPick';
 let weekPick = '';
@@ -425,6 +492,19 @@ const foldToggle = document.querySelector('#fold-toggle');
 function noteText() { return foldedSource + content.value; }
 // Offset of the first heading of the oldest day that stays open, or -1 if there is no earlier text.
 function openFromOffset(text) {
+  const headings = sourceHeadings(text);
+  const dates = NoteWeeks.assignDates(headings.map(heading => heading.text));
+  const last = NoteWeeks.lastDay(dates);
+  if (!last) return -1;
+  const cutoff = NoteWeeks.shownFromDay(last);
+  // With no earlier week there is nothing to fold, so nothing is hidden.
+  if (!dates.some(date => date && date.getTime() < cutoff)) return -1;
+  for (let index = 0; index < dates.length; index += 1) {
+    if (dates[index] && dates[index].getTime() >= cutoff) return headings[index].offset;
+  }
+  return -1;
+}
+function sourceHeadings(text) {
   const headings = [];
   let offset = 0;
   let fenced = false;
@@ -438,16 +518,54 @@ function openFromOffset(text) {
     }
     offset += line.length + 1;
   }
-  const dates = NoteWeeks.assignDates(headings.map(heading => heading.text));
-  const last = NoteWeeks.lastDay(dates);
-  if (!last) return -1;
-  const cutoff = NoteWeeks.shownFromDay(last);
-  // With no earlier week there is nothing to fold, so nothing is hidden.
-  if (!dates.some(date => date && date.getTime() < cutoff)) return -1;
-  for (let index = 0; index < dates.length; index += 1) {
-    if (dates[index] && dates[index].getTime() >= cutoff) return headings[index].offset;
+  return headings;
+}
+// Choose the newest date, not simply the last heading: some notes run newest first.
+function latestDayIndex(texts) {
+  const dates = NoteWeeks.assignDates(texts);
+  let latest = -1;
+  dates.forEach((date, index) => {
+    if (date && (latest === -1 || date >= dates[latest])) latest = index;
+  });
+  return latest;
+}
+// Measure wrapped source lines using the textarea's actual font and usable width.
+// No focus is needed, so opening a note on a phone does not summon its keyboard.
+function sourceOffsetTop(offset) {
+  const style = getComputedStyle(content);
+  const mirror = document.createElement('div');
+  for (const property of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'tabSize', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'wordBreak', 'overflowWrap']) {
+    mirror.style[property] = style[property];
   }
-  return -1;
+  Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', pointerEvents: 'none', boxSizing: 'border-box', width: content.clientWidth + 'px', whiteSpace: 'pre-wrap' });
+  mirror.textContent = content.value.slice(0, offset);
+  const marker = document.createElement('span');
+  Object.assign(marker.style, { display: 'inline-block', height: style.lineHeight, verticalAlign: 'top' });
+  marker.textContent = '\u200b';
+  mirror.append(marker);
+  document.body.append(mirror);
+  const top = marker.getBoundingClientRect().top - mirror.getBoundingClientRect().top;
+  mirror.remove();
+  return top;
+}
+function scrollToLatestDay() {
+  const headings = sourceHeadings(noteText());
+  const latest = latestDayIndex(headings.map(heading => heading.text));
+  const offset = latest === -1 ? 0 : Math.max(0, headings[latest].offset - foldedSource.length);
+  content.setSelectionRange(offset, offset);
+  // Each pane has different wrapping and markup. Position them independently,
+  // without the proportional split-view scroll follower undoing either jump.
+  for (const pane of [content, preview]) movedByCode.add(pane);
+  if (content.clientWidth) content.scrollTop = latest === -1 ? 0 : sourceOffsetTop(offset);
+  if (preview.clientWidth) {
+    const shown = [...preview.children].filter(node => /^H[1-6]$/.test(node.tagName));
+    const index = latestDayIndex(shown.map(node => node.textContent));
+    preview.scrollTop = index === -1 ? 0 : preview.scrollTop + shown[index].getBoundingClientRect().top - preview.getBoundingClientRect().top;
+  }
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    movedByCode.delete(content);
+    movedByCode.delete(preview);
+  }));
 }
 function updateFoldNote() {
   const hidden = foldedSource ? foldedSource.split('\n').length - 1 : 0;
@@ -533,6 +651,13 @@ function toggleTasks() {
   else content.setSelectionRange(start, start + text.length);
 }
 function replaceSelection(text, start, end) {
+  // In Live view the textarea is hidden and cannot take typing, so the text goes
+  // in directly, and the input event copies it to the live view.
+  if (editor.dataset.view === 'live') {
+    content.setRangeText(text, start, end, 'end');
+    content.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
   content.focus();
   content.setSelectionRange(start, end);
   let ok = false;
@@ -587,6 +712,7 @@ function wrapSelection(marker) {
 function updateControls() {
   const trashed = Boolean(current?.deleted_at);
   content.disabled = busy || trashed || (mode === 'trash' && !current);
+  live.disabled = content.disabled;
   deleteButton.hidden = mode === 'trash';
   deleteButton.disabled = busy;
   restoreButton.hidden = !trashed;
@@ -762,6 +888,11 @@ function show(note) {
   updateControls();
   render();
   document.dispatchEvent(new Event('note-shown'));
+  // Wait for the restored note layout, and ignore a stale jump after switching.
+  const text = noteText();
+  requestAnimationFrame(() => {
+    if (current === note && noteText() === text) scrollToLatestDay();
+  });
 }
 function schedule() {
   clearTimeout(timer);
@@ -829,17 +960,27 @@ async function doSave() {
   updateControls();
   render();
 }
-async function openNote(id) {
+async function openNote(id, { active = false } = {}) {
   if (busy) return;
   if (!(await flush())) return;
   setBusy(true);
   message('Loading…');
   try {
+    if (active && mode === 'trash') {
+      notes = await api('');
+      mode = 'active';
+    }
     show(await api('/' + id));
     message(current.deleted_at ? 'In trash — restore it to edit.' : 'Saved');
   } catch (error) { message(error.message, true); }
   finally { setBusy(false); }
 }
+document.addEventListener('interview-note-saved', event => {
+  if (mode !== 'active') return;
+  const note = event.detail;
+  notes = [note, ...notes.filter(item => item.id !== note.id)];
+  render();
+});
 newButton.onclick = async () => {
   if (busy || mode === 'trash') return;
   if (!(await flush())) return;
@@ -980,7 +1121,7 @@ content.addEventListener('blur', () => { tabMovesFocus = false; });
 const VIEW_KEY = 'noteView';
 try {
   const saved = localStorage.getItem(VIEW_KEY);
-  if (saved && ['edit', 'split', 'preview'].includes(saved)) view = saved;
+  if (saved && ['edit', 'live', 'split', 'preview'].includes(saved)) view = saved;
 } catch {}
 function applyView() {
   const shown = phoneLayout.matches && view === 'split' ? 'edit' : view;
@@ -1049,11 +1190,30 @@ function toggleUnravel() {
 unravelButton.addEventListener('click', toggleUnravel);
 foldToggle.addEventListener('click', toggleUnravel);
 showUnraveled();
-// Starting a new week changes what the preview folds. The editor catches up when
-// you leave it, so the text never moves under the caret while you type.
-content.addEventListener('blur', () => {
+// Starting a new day changes what the preview folds. The editor catches up when
+// you pause in the new day, or when you leave it. The caret keeps its place on the
+// screen, so the text above it goes away without moving what you type.
+const REFOLD_PAUSE = 800;
+let refoldTimer;
+function refoldKeepingCaret() {
   if (unraveled) return;
-  if (Math.max(0, openFromOffset(noteText())) !== foldedSource.length) resplitSource();
+  const split = Math.max(0, openFromOffset(noteText()));
+  if (split === foldedSource.length) return;
+  const caret = content.selectionEnd + foldedSource.length;
+  if ((document.activeElement === content || document.activeElement === live) && caret < split) return;
+  const before = content.clientWidth ? sourceOffsetTop(content.selectionEnd) - content.scrollTop : 0;
+  resplitSource();
+  movedByCode.add(content);
+  if (content.clientWidth) content.scrollTop = Math.max(0, sourceOffsetTop(content.selectionEnd) - before);
+  requestAnimationFrame(() => movedByCode.delete(content));
+}
+content.addEventListener('input', () => {
+  clearTimeout(refoldTimer);
+  refoldTimer = setTimeout(refoldKeepingCaret, REFOLD_PAUSE);
+});
+content.addEventListener('blur', () => {
+  clearTimeout(refoldTimer);
+  refoldKeepingCaret();
 });
 const SPELL_KEY = 'noteSpellcheck';
 try {
@@ -1067,17 +1227,19 @@ spellcheck.addEventListener('change', () => {
 applySpellcheck();
 document.addEventListener('keydown', event => {
   if (!(event.metaKey || event.ctrlKey)) return;
+  // The selectionchange event can come after a fast key, so read the caret now.
+  if (document.activeElement === live) content.setSelectionRange(live.selectionStart, live.selectionEnd);
   const key = event.key.toLowerCase();
   if (key === 's') {
     event.preventDefault();
     if (!busy && mode === 'active') saveNote();
-  } else if ((key === 'b' || key === 'i') && document.activeElement === content) {
+  } else if ((key === 'b' || key === 'i') && (document.activeElement === content || document.activeElement === live)) {
     event.preventDefault();
     if (mode === 'active') wrapSelection(key === 'b' ? '**' : '*');
   } else if (key === '\\' && !event.shiftKey && !event.altKey) {
     event.preventDefault();
     applyCollapsed(!document.body.classList.contains('collapsed'));
-  } else if (key === 'l' && document.activeElement === content && !event.shiftKey && !event.altKey) {
+  } else if (key === 'l' && (document.activeElement === content || document.activeElement === live) && !event.shiftKey && !event.altKey) {
     event.preventDefault();
     toggleTasks();
   }
@@ -1222,8 +1384,10 @@ async function uploadImages(files) {
     insertingImage = true;
     try { replaceSelection(markdown, start, end); }
     finally { insertingImage = false; }
-    view = window.matchMedia('(max-width: 600px)').matches ? 'preview' : 'split';
-    applyView();
+    if (view !== 'live') {
+      view = window.matchMedia('(max-width: 600px)').matches ? 'preview' : 'split';
+      applyView();
+    }
   }
   if (failure) message(failure, true);
 }
@@ -1233,12 +1397,13 @@ imageFile.onchange = () => {
   imageFile.value = '';
   uploadImages(files);
 };
-content.addEventListener('paste', event => {
+for (const field of [content, live]) field.addEventListener('paste', event => {
   const files = [...(event.clipboardData?.files || [])];
   if (!files.length) return;
   event.preventDefault();
+  event.stopImmediatePropagation();
   uploadImages(files);
-});
+}, true);
 editor.addEventListener('dragover', event => {
   if (![...event.dataTransfer.types].includes('Files')) return;
   event.preventDefault();
@@ -1615,7 +1780,7 @@ function renderReport() {
   }
 }
 function showReport(open) {
-  window.closeRoadmap?.();
+  window.closeInterview?.();
   window.closeBooks?.();
   window.closeFiles?.();
   main.dataset.page = open ? 'report' : 'notes';

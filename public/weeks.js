@@ -11,15 +11,32 @@
   // when it fits the earlier heading by more than this many days better.
   const DAY_FIRST_PENALTY = 20;
   // A note is written forward in time, so a date before the previous heading is
-  // less likely than one after it. The first heading has no such rule: it is
-  // measured against today, and an old note starts in the past.
+  // less likely than one after it. The first heading is measured against today,
+  // and a note seldom starts in the future, so "9/11" is September, not 9 November.
   const BACKWARD_PENALTY = 30;
+  const FUTURE_PENALTY = 30;
   // "3 oct 2026", "Oct 3", "10 October", "Mon 5th Oct". The whole word must be a month,
-  // so "5 minutes" is not a date.
+  // so "5 minutes" is not a date. Russian months count too, in Cyrillic and in Latin
+  // letters: "31 октября", "31 oktabrya", "31 oktyabrya".
   const MONTHS = { jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2, apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6, aug: 7, august: 7, sep: 8, sept: 8, september: 8, oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11 };
+  const RUSSIAN_MONTHS = [
+    ['январь', 'января', 'yanvar', 'yanvarya', 'janvar', 'janvarya'],
+    ['февраль', 'февраля', 'fevral', 'fevralya', 'fevrala'],
+    ['март', 'марта', 'mart', 'marta'],
+    ['апрель', 'апреля', 'aprel', 'aprelya', 'aprela'],
+    ['май', 'мая', 'maya', 'maja'],
+    ['июнь', 'июня', 'iyun', 'iyunya', 'iyuna', 'iyunia'],
+    ['июль', 'июля', 'iyul', 'iyulya', 'iyula', 'iyulia'],
+    ['август', 'августа', 'avgust', 'avgusta'],
+    ['сентябрь', 'сентября', 'sentyabr', 'sentyabrya', 'sentabr', 'sentabrya'],
+    ['октябрь', 'октября', 'oktyabr', 'oktyabrya', 'oktabr', 'oktabrya'],
+    ['ноябрь', 'ноября', 'noyabr', 'noyabrya', 'noabr', 'noabrya'],
+    ['декабрь', 'декабря', 'dekabr', 'dekabrya', 'dekabra'],
+  ];
+  RUSSIAN_MONTHS.forEach((names, month) => names.forEach(name => { MONTHS[name] = month; }));
   const WEEKDAY = '(?:(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\\.?,?\\s+)?';
-  const DAY_MONTH = new RegExp('^' + WEEKDAY + '(\\d{1,2})(?:st|nd|rd|th)?\\s+([a-z]{3,9})\\.?(?:,?\\s+(\\d{4}))?(?![\\w])', 'i');
-  const MONTH_DAY = new RegExp('^' + WEEKDAY + '([a-z]{3,9})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?(?![\\w])', 'i');
+  const DAY_MONTH = new RegExp('^' + WEEKDAY + '(\\d{1,2})(?:\\s*(?:st|nd|rd|th))?\\s+(?:of\\s+)?([a-zа-яё]{3,10})\\.?(?:,?\\s+(\\d{4}))?(?![\\wа-яё])', 'i');
+  const MONTH_DAY = new RegExp('^' + WEEKDAY + '([a-zа-яё]{3,10})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?(?![\\wа-яё])', 'i');
   const ISO_DAY = /^(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/;
   const SLASH_DAY = /^(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?(?!\d)/;
 
@@ -60,11 +77,37 @@
       for (const candidate of years) {
         const date = validDate(candidate, reading.month, reading.day);
         if (!date) continue;
-        const score = Math.abs(date - anchor) / DAY + reading.penalty + (fromHeading && date < anchor ? BACKWARD_PENALTY : 0);
+        const order = fromHeading ? (date < anchor ? BACKWARD_PENALTY : 0) : (date > anchor ? FUTURE_PENALTY : 0);
+        const score = Math.abs(date - anchor) / DAY + reading.penalty + order;
         if (!best || score < best.score) best = { date, score };
       }
     }
     return best ? best.date : null;
+  }
+
+  // A month name, or a slip of the keyboard in a long one: "novmber" and "oktyabraya"
+  // still name a month. The first three letters must be right, and one wrong letter
+  // is allowed in a name of five or six letters, two in a longer one. So "mayor",
+  // "market" and "decision" stay words.
+  function monthNamed(word) {
+    if (MONTHS[word] !== undefined) return MONTHS[word];
+    for (const [name, month] of Object.entries(MONTHS)) {
+      if (name.length < 5 || name.slice(0, 3) !== word.slice(0, 3)) continue;
+      if (editDistance(word, name) <= (name.length >= 7 ? 2 : 1)) return month;
+    }
+    return undefined;
+  }
+
+  function editDistance(a, b) {
+    let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= a.length; i += 1) {
+      const current = [i];
+      for (let j = 1; j <= b.length; j += 1) {
+        current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      previous = current;
+    }
+    return previous[b.length];
   }
 
   // A month written as a word: "3 oct 2026" or "Oct 3".
@@ -74,7 +117,7 @@
     if (match) [, day, name, year] = match;
     else if ((match = MONTH_DAY.exec(trimmed))) [, name, day, year] = match;
     else return null;
-    const month = MONTHS[name.toLowerCase()];
+    const month = monthNamed(name.toLowerCase());
     if (month === undefined) return null;
     return bestReading([{ month, day: Number(day), penalty: 0 }], year ? Number(year) : null, anchor, fromHeading);
   }
@@ -83,8 +126,20 @@
   function assignDates(texts, today = new Date()) {
     let anchor = today;
     let fromHeading = false;
-    return texts.map(text => {
-      const date = parseDay(text, anchor, fromHeading);
+    return texts.map((text, index) => {
+      // The next unambiguous date is a better anchor than the clock for the
+      // first ambiguous heading in an old journal (9/11 followed by 9/15).
+      let firstAnchor = anchor;
+      const numeric = SLASH_DAY.exec(text.trim());
+      if (!fromHeading && numeric && Number(numeric[1]) <= 12 && Number(numeric[2]) <= 12) {
+        for (const next of texts.slice(index + 1)) {
+          const slash = SLASH_DAY.exec(next.trim());
+          if (slash && Number(slash[1]) <= 12 && Number(slash[2]) <= 12) continue;
+          const date = parseDay(next, anchor);
+          if (date) { firstAnchor = date; break; }
+        }
+      }
+      const date = parseDay(text, firstAnchor, fromHeading);
       if (date) { anchor = date; fromHeading = true; }
       return date;
     });
@@ -98,7 +153,7 @@
   }
 
   // Compact mode keeps this many days open, counting the last day heading.
-  const DAYS_SHOWN = 5;
+  const DAYS_SHOWN = 1;
   // Midnight of the oldest day that stays open.
   function shownFromDay(last, count = DAYS_SHOWN) {
     return new Date(last.getFullYear(), last.getMonth(), last.getDate() - (count - 1)).getTime();

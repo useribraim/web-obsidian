@@ -1,7 +1,6 @@
 /* A reminder lives outside the editor's scroll area, so it remains in view. */
 .pinned-note { flex: none; width: calc(100% - 40px); max-width: 1036px; margin: 8px auto 12px; padding: 12px 16px; border: 1px solid var(--accent-border); border-left: 3px solid var(--accent); border-radius: 7px; background: var(--accent-soft); color: var(--accent-text); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 25dvh; overflow: auto; }
 main:not([data-page="notes"]) > .pinned-note { display: none; }
-/* Complete semantic palettes shared by notes, navigation, and the roadmap. */
 :root:is([data-theme="forest"], [data-theme="nord"]) {
   color-scheme: dark;
   --heading-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -36,22 +35,11 @@ main:not([data-page="notes"]) > .pinned-note { display: none; }
 #theme { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--control-border); border-radius: 5px; padding: 8px; min-height: 40px; }
 #theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 :root:is([data-theme="forest"], [data-theme="nord"]) :is(.mobile-header, #sidebar) { background: var(--sidebar); border-color: var(--border); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(#mobile-nav, #sidebar #logout, #app-main #status, #roadmap-status, .roadmap-intro p, .roadmap-overview span, .roadmap-guidance, .roadmap-stage-heading p, .roadmap-group h3, .roadmap-finish p, #roadmap-empty) { color: var(--muted); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(#mobile-timer, .roadmap-eyebrow, #roadmap-next, .roadmap-stage-count) { color: var(--accent-text); }
+:root:is([data-theme="forest"], [data-theme="nord"]) :is(#mobile-nav, #sidebar #logout, #app-main #status) { color: var(--muted); }
+:root:is([data-theme="forest"], [data-theme="nord"]) #mobile-timer { color: var(--accent-text); }
 :root:is([data-theme="forest"], [data-theme="nord"]) :is(#more-menu > #add-image, #more-menu > #unravel) { color: var(--text); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(#sidebar > .timer, #sidebar > footer, .roadmap-stage-body, .roadmap-problem) { border-color: var(--border); }
+:root:is([data-theme="forest"], [data-theme="nord"]) :is(#sidebar > .timer, #sidebar > footer) { border-color: var(--border); }
 :root:is([data-theme="forest"], [data-theme="nord"]) #app-main > .toolbar > .views { background: var(--code-bg); }
 :root:is([data-theme="forest"], [data-theme="nord"]) #app-main .view-option { color: var(--muted); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(#app-main .view-option.active, .roadmap-overview, .roadmap-checkpoint, .roadmap-step) { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-border); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(#app-main #status.error, #roadmap-status.error) { color: var(--danger); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(#roadmap-search, #roadmap-filter, .roadmap-stage) { color: var(--text); background: var(--surface); border-color: var(--control-border); }
-:root:is([data-theme="forest"], [data-theme="nord"]) .roadmap-stage.current { border-color: var(--accent); }
-:root:is([data-theme="forest"], [data-theme="nord"]) #roadmap-continue { color: var(--accent-text); background: var(--accent-hover); border-color: var(--accent-border); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(.roadmap-finish, .roadmap-stage:not(:last-child)::after) { border-color: var(--accent-border); }
-:root:is([data-theme="forest"], [data-theme="nord"]) .roadmap-stage:not(:last-child)::after { background: var(--accent-border); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(.roadmap-problem a, .roadmap-finish a) { color: var(--link); }
-:root:is([data-theme="forest"], [data-theme="nord"]) .roadmap-check input { accent-color: var(--accent); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(.roadmap-problem.done a, .roadmap-difficulty.easy, .roadmap-stage.complete .roadmap-step) { color: var(--success); }
-:root:is([data-theme="forest"], [data-theme="nord"]) :is(.roadmap-difficulty.easy, .roadmap-stage.complete .roadmap-step) { background: var(--success-bg); border-color: var(--success-border); }
-:root:is([data-theme="forest"], [data-theme="nord"]) .roadmap progress::-webkit-progress-value { background: var(--accent); }
-:root:is([data-theme="forest"], [data-theme="nord"]) .roadmap progress::-moz-progress-bar { background: var(--accent); }
+:root:is([data-theme="forest"], [data-theme="nord"]) #app-main .view-option.active { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-border); }
+:root:is([data-theme="forest"], [data-theme="nord"]) #app-main #status.error { color: var(--danger); }

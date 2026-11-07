@@ -3,16 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
-  <meta name="theme-color" content="#f0eee6">
+  <meta name="theme-color" content="#191919">
   <script>
-    // Apply the remembered theme before the stylesheet to avoid a flash.
+    // Apply the remembered theme before the stylesheet to avoid a flash. Dark is the default.
     try {
       const colors = { light: '#f0eee6', dark: '#191919', forest: '#141e18', nord: '#272c36' };
       const saved = localStorage.getItem('noteTheme');
-      const theme = Object.hasOwn(colors, saved) ? saved : 'light';
+      const theme = Object.hasOwn(colors, saved) ? saved : 'dark';
       document.documentElement.dataset.theme = theme;
       document.querySelector('meta[name="theme-color"]').content = colors[theme];
-    } catch {}
+    } catch {
+      document.documentElement.dataset.theme = 'dark';
+    }
   </script>
   <title>Notes</title>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
@@ -25,15 +27,19 @@
   <link rel="mask-icon" href="/mask-icon.svg" color="#202020">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/mobile.css">
-  <link rel="stylesheet" href="/roadmap.css">
+  <link rel="stylesheet" href="/interview.css">
+  <link rel="stylesheet" href="/live-view.css">
   <link rel="stylesheet" href="/themes.css">
   <script src="/weeks.js" defer></script>
+  <script src="/tokenizer.js" defer></script>
+  <script src="/live-view.js" defer></script>
   <script src="/app.js" defer></script>
   <script src="/pdf-view.js" defer></script>
   <script src="/books.js" defer></script>
   <script src="/files.js" defer></script>
   <script src="/mobile.js" defer></script>
-  <script src="/roadmap.js" type="module"></script>
+  <script src="/daily-note.js" defer></script>
+  <script src="/interview.js" type="module"></script>
 </head>
 <body>
   <div class="mobile-header">
@@ -44,10 +50,12 @@
   <div id="nav-backdrop" hidden></div>
   <aside id="sidebar" aria-label="Navigation">
     <header><span class="brand" id="sidebar-title"><span class="gem">◇</span> Notes</span><span class="head-actions"><button id="logout" title="Sign out">Sign out</button><button id="new" title="New note" aria-label="New note">+</button><button id="collapse" class="rail-toggle" type="button" aria-label="Collapse the sidebar (⌘\)" aria-expanded="true" title="Collapse the sidebar (⌘\)">‹</button><button id="mobile-nav-close" type="button" aria-label="Close navigation">×</button></span></header>
+    <button id="daily-open" class="books-link daily-link" type="button" aria-expanded="false" aria-controls="daily-note" title="Show or hide the daily note (⌘J)">Daily</button>
     <a id="books-open" class="books-link" href="#/books" title="Open your books">Books</a>
     <a id="files-open" class="books-link" href="#/files" title="Send a file to your other devices">Files</a>
-    <a id="roadmap-open" class="books-link" href="#/roadmap" title="Your LeetCode study roadmap">Roadmap</a>
-    <input id="search" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off" maxlength="100">
+    <a id="interview-open" class="books-link" href="#/interview" title="Practice interview questions and keep your mistakes">Interview prep</a>
+    <a id="agents-open" class="books-link" href="/agents.html" title="Manage MCP notebook access">Agent connections</a>
+    <input id="search" type="search" placeholder="Search notes" aria-label="Search notes" autocomplete="off" maxlength="100" hidden>
     <nav id="notes" aria-label="Notes"></nav>
     <section class="timer" aria-label="Time tracker">
       <input id="task" type="text" placeholder="What are you working on?" maxlength="200" autocomplete="off" aria-label="Task description">
@@ -75,21 +83,39 @@
       </button><div class="size-picker"><button id="size" type="button" aria-label="Text size: 14 pixels" aria-expanded="false" aria-controls="size-options">14 px ▾</button><div id="size-options" role="group" aria-label="Text size" hidden><button type="button" data-size="8">8 px</button><button type="button" data-size="10">10 px</button><button type="button" data-size="12">12 px</button><button type="button" data-size="14">14 px</button><button type="button" data-size="16">16 px</button><button type="button" data-size="18">18 px</button><button type="button" data-size="20">20 px</button><button type="button" data-size="24">24 px</button></div></div></footer>
   </aside>
   <main id="app-main" data-page="notes">
-    <section id="roadmap-view" class="roadmap" aria-label="LeetCode 150 roadmap">
-      <div class="roadmap-content">
-        <div class="roadmap-heading"><button id="roadmap-close" class="tool" type="button">‹ Notes</button><span id="roadmap-status" role="status">Loading progress…</span><button id="roadmap-retry" class="tool" type="button" hidden>Retry</button></div>
-        <div class="roadmap-intro"><span class="roadmap-eyebrow">YOUR STUDY PATH</span><h1>LeetCode 150</h1><p>Ten stages. One problem at a time.</p></div>
-        <div class="roadmap-overview">
-          <div><strong id="roadmap-count">0 / 150</strong><span>problems completed</span></div>
-          <button id="roadmap-continue" class="tool" type="button" disabled>Continue →</button>
-          <progress id="roadmap-progress" max="150" value="0" aria-label="Overall roadmap progress"></progress>
-          <p id="roadmap-next">Your progress is saved to this private site, across devices.</p>
+    <section id="interview-view" class="interview" aria-label="Interview prep">
+      <div class="interview-content">
+        <div class="interview-heading"><button id="interview-close" class="tool" type="button">‹ Notes</button><span>Practice → understand → revisit</span></div>
+        <div class="interview-intro"><span class="interview-eyebrow">A SMALL DAILY PRACTICE</span><h1>Interview prep</h1><p>Ten questions. Keep what you missed.</p></div>
+        <p id="interview-recovery" class="interview-warning" role="status" hidden></p>
+        <div id="interview-setup" class="interview-card">
+          <h2>What are we working on?</h2>
+          <p>Choose a topic for a fresh, shuffled round. You’ll get an explanation after each answer.</p>
+          <label for="interview-topic">Practice topic</label>
+          <select id="interview-topic"></select>
+          <div class="interview-details"><span>10 multiple-choice questions</span><span>About 5–10 minutes</span></div>
+          <button id="interview-start" class="tool interview-primary" type="button">Start a round →</button>
+          <div class="interview-save-hint"><strong>Your mistakes become your study notes.</strong><p>At the end, missed questions, your answers, and explanations are saved in a new notebook note. Download a Markdown file too, if you like.</p></div>
+          <p class="interview-bank">40 built-in Python 3 and C++17 questions, from fundamentals to intermediate.</p>
         </div>
-        <p class="roadmap-guidance">Follow the path, not a deadline. Start with Easy and Medium; revisit Hards later. Tick a problem when you can solve it independently and explain its complexity. This tracks your practice here, not your LeetCode account.</p>
-        <div class="roadmap-controls"><input id="roadmap-search" type="search" placeholder="Find a problem or topic…" aria-label="Find a roadmap problem or topic" maxlength="150"><select id="roadmap-filter" aria-label="Filter roadmap problems"><option value="all">All problems</option><option value="remaining">Remaining</option><option value="completed">Completed</option></select></div>
-        <p id="roadmap-empty" hidden>No problems match your filters.</p>
-        <div id="roadmap-stages" class="roadmap-stages" aria-busy="true"></div>
-        <div class="roadmap-finish"><span class="roadmap-eyebrow">THE FINISH LINE</span><h2>Mixed, timed interviews</h2><p>No topic labels. Explain your approach aloud, implement it, test edge cases, and state time and space complexity.</p><p>Practice loop: attempt → hint if needed → implement from memory → revisit tomorrow, in a week, and in a month.</p><a href="https://leetcode.com/studyplan/top-interview-150/" target="_blank" rel="noopener noreferrer">The official Top Interview 150 ↗</a></div>
+        <div id="interview-round" hidden>
+          <div class="interview-round-meta"><span id="interview-round-topic"></span><span id="interview-step"></span></div>
+          <progress id="interview-progress" max="10" value="0" aria-label="Questions answered"></progress>
+          <form id="interview-form" class="interview-card">
+            <fieldset id="interview-choices"><legend id="interview-question" tabindex="-1"></legend><div id="interview-options"></div></fieldset>
+            <div id="interview-feedback" class="interview-feedback" role="status" hidden></div>
+            <button id="interview-check" class="tool interview-primary" type="submit" disabled>Check answer</button>
+            <button id="interview-next" class="tool interview-primary" type="button" hidden>Next question →</button>
+          </form>
+          <p class="interview-bank">Leave and come back any time. This round stays in this tab through a reload.</p>
+        </div>
+        <div id="interview-results" hidden>
+          <div class="interview-card interview-summary"><span class="interview-eyebrow">ROUND COMPLETE</span><h2 id="interview-score" tabindex="-1"></h2><p id="interview-result-message"></p></div>
+          <div class="interview-result-actions"><button id="interview-download" class="tool" type="button">Download mistakes .md</button><button id="interview-note" class="tool" type="button" hidden>Open saved note ↗</button><button id="interview-save-retry" class="tool" type="button" hidden>Retry save</button><button id="interview-again" class="tool interview-primary" type="button">New round →</button></div>
+          <p id="interview-save-status" role="status"></p>
+          <h2 id="interview-review-heading">Your review list</h2>
+          <div id="interview-mistakes"></div>
+        </div>
       </div>
     </section>
     <section id="report-view" class="report" hidden aria-label="Time report">
@@ -135,7 +161,7 @@
     </section>
     <div class="toolbar">
       <span id="status" role="status">Loading…</span>
-      <span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span>
+      <span class="views" role="group" aria-label="View"><button class="tool view-option" data-view="edit" aria-label="Editor only">Edit</button><button class="tool view-option" data-view="live" aria-label="Live view: edit the rendered note">Live</button><button class="tool view-option" data-view="split" aria-label="Split view">Split</button><button class="tool view-option" data-view="preview" aria-label="Preview only">Preview</button></span>
       <button id="unravel" class="tool" type="button" aria-pressed="false" title="Unravel: show every week and day">⤢</button>
       <span id="format-group" class="format" role="group" aria-label="Insert"></span>
       <button id="restore" class="tool" hidden>Restore</button>
@@ -164,6 +190,7 @@
               <dt><kbd>⌘L</kbd></dt><dd>Make a task, or tick it</dd>
               <dt><kbd>⌘S</kbd></dt><dd>Save now. It also saves by itself</dd>
               <dt><kbd>⌘\</kbd></dt><dd>Fold the sidebar</dd>
+              <dt><kbd>⌘J</kbd></dt><dd>Show or hide the daily note</dd>
             </dl>
           </details>
           <button id="delete" class="menu-item danger" type="button">Delete</button>
@@ -175,10 +202,17 @@
     <div id="fold-note" class="fold-note" hidden><span id="fold-text"></span><button id="fold-toggle" class="tool" type="button">Show all</button></div>
     <section class="editor" id="editor" data-view="split">
       <textarea id="content" aria-label="Note content" placeholder="Start writing…" maxlength="200000" spellcheck="true"></textarea>
+      <div id="live" aria-label="Live note" placeholder="Start writing…" spellcheck="true"></div>
       <div id="preview" aria-label="Preview"></div>
     </section>
     <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
   </main>
+  <section id="daily-note" class="daily-note" aria-label="Daily note" hidden>
+    <div class="daily-head"><h2>Daily</h2><span id="daily-count" aria-live="polite"></span><button id="daily-close" type="button" aria-label="Hide the daily note" title="Hide (⌘J)">×</button></div>
+    <ul id="daily-items"></ul>
+    <p id="daily-status" role="status" hidden></p>
+    <form id="daily-form"><input id="daily-input" type="text" placeholder="Add a daily task" maxlength="200" autocomplete="off" aria-label="New daily task"></form>
+  </section>
   <dialog id="image-viewer" aria-label="Image preview"><button id="close-image" type="button" aria-label="Close image preview">Close ×</button><img id="enlarged-image" alt=""><p id="image-caption"></p></dialog>
 </body>
 </html>

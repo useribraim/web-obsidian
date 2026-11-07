@@ -1,4 +1,8 @@
-import { ROADMAP_PROBLEMS } from './public/roadmap-data.js';
+import { authenticateMcp, mcpAuthResponse } from './mcp-auth.js';
+import { mcpResponse } from './mcp.js';
+import { interviewResponse } from './interview-api.js';
+import { busResponse } from './bus-api.js';
+import { dailyResponse } from './daily-api.js';
 
 const json = (body, status = 200) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store' },
@@ -29,10 +33,11 @@ function loginPage({ failed = false, next = '/' } = {}) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f0eee6">
+  <meta name="theme-color" content="#191919">
   <script>
+    document.documentElement.dataset.theme = 'dark';
     try {
-      const theme = localStorage.getItem('noteTheme') === 'dark' ? 'dark' : 'light';
+      const theme = localStorage.getItem('noteTheme') === 'light' ? 'light' : 'dark';
       document.documentElement.dataset.theme = theme;
       document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#191919' : '#f0eee6';
     } catch {}
@@ -538,45 +543,67 @@ async function fileResponse(request, env, url) {
   return json({ error: 'Not found.' }, 404);
 }
 
-const roadmapIds = new Set(ROADMAP_PROBLEMS.map(problem => problem.id));
-async function roadmapResponse(request, env, url) {
-  if (url.pathname !== '/api/roadmap' && !url.pathname.startsWith('/api/roadmap/')) return null;
-  if (request.method !== 'GET' && !sameOrigin(request, url)) return json({ error: 'Invalid origin.' }, 403);
-  if (url.pathname === '/api/roadmap' && request.method === 'GET') {
-    const { results } = await env.DB.prepare('SELECT problem_id, completed, updated_at FROM roadmap_progress').all();
-    return json(results);
-  }
-  const id = url.pathname.slice('/api/roadmap/'.length);
-  if (!roadmapIds.has(id)) return json({ error: 'Roadmap problem not found.' }, 404);
-  if (request.method !== 'PUT') return json({ error: 'Method not allowed.' }, 405);
-  const text = await request.text();
-  if (text.length > 512) return json({ error: 'Progress update is too large.' }, 413);
-  let data;
-  try { data = JSON.parse(text); } catch { return json({ error: 'Invalid progress update.' }, 400); }
-  if (typeof data?.completed !== 'boolean') return json({ error: 'Completed must be true or false.' }, 400);
-  const updatedAt = new Date().toISOString();
-  // One row per problem: another device's changes to other problems cannot be overwritten.
-  await env.DB.prepare(
-    'INSERT INTO roadmap_progress (problem_id, completed, updated_at) VALUES (?, ?, ?) ON CONFLICT(problem_id) DO UPDATE SET completed = excluded.completed, updated_at = excluded.updated_at'
-  ).bind(id, Number(data.completed), updatedAt).run();
-  return json({ problem_id: id, completed: Number(data.completed), updated_at: updatedAt });
-}
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
       const auth = await authResponse(request, env, url);
       if (auth) return auth;
-      if (!(await isAuthenticated(request, env))) {
+      if (url.pathname === '/mcp') {
+        const principal = await authenticateMcp(request, env);
+        if (!principal) {
+          return new Response(JSON.stringify({ error: 'A notebook MCP access token is required.' }), {
+            status: 401,
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-store',
+              'WWW-Authenticate': `Bearer resource_metadata="${url.origin}/.well-known/oauth-protected-resource/mcp"`,
+            },
+          });
+        }
+        return await mcpResponse(request, env, principal);
+      }
+      const authenticated = await isAuthenticated(request, env);
+      if (url.pathname === '/oauth/authorize' && request.method === 'GET' && !authenticated) {
+        return new Response(loginPage({ next: url.pathname + url.search }), {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store',
+            'X-Frame-Options': 'DENY',
+            'Content-Security-Policy': "frame-ancestors 'none'",
+          },
+        });
+      }
+      if (url.pathname.startsWith('/oauth/') || url.pathname.startsWith('/.well-known/') || url.pathname.startsWith('/api/agent-connections')) {
+        const response = await mcpAuthResponse(request, env, { authenticated });
+        if (response) return response;
+        return json({ error: 'Not found.' }, 404);
+      }
+      if (!authenticated) {
         if (!url.pathname.startsWith('/api/')) {
           return new Response(loginPage({ next: url.pathname + url.search }), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
         }
         return json({ error: 'Sign in required.' }, 401);
       }
-      if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(request);
-      const roadmap = await roadmapResponse(request, env, url);
-      if (roadmap) return roadmap;
+      if (!url.pathname.startsWith('/api/')) {
+        if (url.hostname === 'prep.ibraim.ie' && url.pathname === '/') {
+          const assetUrl = new URL('/prep.html', url);
+          return env.ASSETS.fetch(new Request(assetUrl, request));
+        }
+        const response = await env.ASSETS.fetch(request);
+        if (url.pathname !== '/agents' && url.pathname !== '/agents.html') return response;
+        const headers = new Headers(response.headers);
+        headers.set('Cache-Control', 'no-store');
+        headers.set('X-Frame-Options', 'DENY');
+        headers.set('Content-Security-Policy', "default-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      }
+      const interview = await interviewResponse(request, env, url);
+      if (interview) return interview;
+      const buses = await busResponse(request, env, url);
+      if (buses) return buses;
+      const daily = await dailyResponse(request, env, url);
+      if (daily) return daily;
       const image = await imageResponse(request, env, url);
       if (image) return image;
       const time = await timeResponse(request, env, url);

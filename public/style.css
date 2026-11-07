@@ -132,12 +132,15 @@ a.tool { text-decoration: none; }
 #restore:hover { background: var(--success-hover); }
 
 kbd { font: inherit; opacity: .5; margin-left: 8px; }
-.editor { width: 100%; max-width: 1100px; margin: 24px auto 0; padding: 0 32px; flex: 1; min-height: 0; display: flex; align-items: stretch; }
+.editor { width: 100%; margin: 24px 0 0; padding: 0 32px; flex: 1; min-height: 0; display: flex; align-items: stretch; }
 .editor > * { flex: 1 1 0; min-width: 0; min-height: 0; }
 .editor[data-view="edit"] #preview { display: none; }
 .editor[data-view="preview"] #content { display: none; }
 .editor[data-view="edit"] #content { padding-right: 0; }
 .editor[data-view="preview"] #preview { border-left: 0; padding-left: 0; }
+/* Live view shows one rendered, editable note. The textarea stays as the source. */
+.editor:not([data-view="live"]) #live { display: none; }
+.editor[data-view="live"] #content, .editor[data-view="live"] #preview { display: none; }
 input, textarea { color: var(--text); background: transparent; border: 0; outline: none; }
 .rename { display: block; width: 100%; padding: 9px 12px; margin-bottom: 3px; font-size: 13px; color: var(--accent-text); background: var(--surface); border: 1px solid var(--accent); border-radius: 5px; }
 #content { resize: none; overflow: auto; padding: 0 26px 36px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--note-size); line-height: 1.75; tab-size: 2; }
@@ -169,6 +172,18 @@ input, textarea { color: var(--text); background: transparent; border: 0; outlin
 #preview a { color: var(--link); }
 #preview hr { margin: 1.1em 0; border: 0; border-top: 1px solid var(--hover); }
 #preview del { color: var(--subtle); }
+#preview .table-scroll { max-width: 100%; overflow-x: auto; margin: .4em 0 1.25em; border: 1px solid var(--accent-border); border-radius: 8px; background: var(--panel); }
+#preview .table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#preview table { width: 100%; min-width: 560px; border-collapse: collapse; table-layout: fixed; font-size: .9em; line-height: 1.55; }
+#preview th, #preview td { padding: 12px 16px; vertical-align: top; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); overflow-wrap: anywhere; }
+#preview th { background: var(--accent-soft); color: var(--heading); font-weight: 650; }
+#preview th:last-child, #preview td:last-child { border-right: 0; }
+#preview tbody tr:last-child td { border-bottom: 0; }
+#preview tbody tr:nth-child(even) { background: var(--surface); }
+#preview tbody tr:hover { background: var(--hover); }
+#preview .table-left { text-align: left; }
+#preview .table-center { text-align: center; }
+#preview .table-right { text-align: right; }
 #preview img { max-width: 100%; border-radius: 6px; }
 #preview figure { margin: 1.25em 0; }
 #preview .note-image { display: inline-block; max-width: 100%; padding: 0; overflow: hidden; border: 1px solid var(--control-border); border-radius: 10px; background: var(--sidebar); cursor: zoom-in; vertical-align: middle; }
@@ -184,24 +199,6 @@ input, textarea { color: var(--text); background: transparent; border: 0; outlin
 #image-caption { margin: 12px 0 0; text-align: center; font-size: 13px; color: var(--secondary); overflow-wrap: anywhere; }
 #image-caption:empty { display: none; }
 textarea::placeholder { color: var(--subtle); }
-@media (max-width: 600px) {
-  body { flex-direction: column; }
-  aside { width: 100%; padding: 10px 14px; border-right: 0; border-bottom: 1px solid var(--border); max-height: 250px; }
-  header { padding: 0 2px 6px; }
-  nav { display: flex; flex: auto; overflow-x: auto; }
-  .note { width: auto; max-width: 180px; flex-shrink: 0; margin: 0 4px 0 0; }
-  footer { padding: 6px 2px 0; gap: 0; }
-  .dot, .foot-text { display: none; }
-  .toolbar { padding: 14px 20px; min-height: 58px; }
-  main { min-height: 0; }
-  .editor { margin-top: 8px; padding: 0 20px; flex-direction: column; }
-  #content { padding: 0 0 36px; }
-  #preview { border-left: 0; padding: 0 0 36px; }
-  .view-option[data-view="split"] { display: none; }
-  .editor[data-view="edit"] #content { padding-right: 0; }
-  .rename { width: 180px; flex-shrink: 0; margin: 0 4px 0 0; }
-  #size-options { top: calc(100% + 8px); bottom: auto; }
-}
 /* Time tracker in the sidebar. */
 .timer { border-top: 1px solid var(--border); padding: 12px 4px 0; display: flex; flex-direction: column; gap: 8px; }
 #task { width: 100%; padding: 7px 9px; font-size: 13px; color: var(--text); background: var(--surface); border: 1px solid var(--control-border); border-radius: 5px; }
@@ -250,10 +247,6 @@ main[data-page="report"] .toolbar, main[data-page="report"] .editor, main[data-p
 .entry-form-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .report .empty { padding: 20px 4px; text-align: center; }
 @media (max-width: 600px) {
-  .timer { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 8px 0 0; gap: 6px; }
-  #task { flex: 1 1 140px; width: auto; }
-  #clock { font-size: 16px; }
-  .timer-summary { width: auto; flex: 1 1 100%; padding: 4px 2px; }
   .report { padding: 16px 20px 32px; }
   .totals { gap: 8px; }
   .total { padding: 10px 12px; }
@@ -277,12 +270,6 @@ body.focus .toolbar > :not(.more, #unravel, #status) { display: none; }
 body.focus .menu > :not(.focus-item) { display: none; }
 body.focus #status:not(.error) { display: none; }
 body.focus .editor { margin-top: 12px; }
-@media (max-width: 600px) {
-  body.focus aside { padding: 10px 0; }
-  body.focus .timer { flex-wrap: wrap; padding: 0 20px; }
-  body.focus .toolbar { padding: 8px 20px 0; }
-  body.focus #preview { border-top: 1px solid var(--border); padding-top: 12px; }
-}
 
 /* Books: the library, and the reader. */
 .books-link { display: block; width: 100%; margin: 0 0 6px; padding: 10px 12px; text-align: left; font-size: 13px; color: var(--muted); text-decoration: none; border-radius: 5px; }
@@ -367,9 +354,6 @@ body.focus .fold-note { padding-top: 8px; }
 #preview .week-close { padding: 5px 10px; font-size: .85em; color: var(--accent-text); background: var(--surface); border: 1px solid var(--control-border); border-radius: 6px; }
 #preview .week-close:hover { background: var(--hover); }
 #preview .week-sub { margin: 1.2em 0 .3em; padding-top: .8em; border-top: 1px solid var(--border); color: var(--subtle); font-size: .8em; letter-spacing: .04em; text-transform: uppercase; }
-@media (max-width: 600px) {
-  .fold-note { padding: 0 20px; flex-wrap: wrap; }
-}
 
 /* File exchange. It shares the rows of the book library. */
 #files-open::before { content: '⇅'; }
@@ -394,34 +378,21 @@ body.focus .fold-note { padding-top: 8px; }
 .menu-item.danger { color: var(--danger); border-top: 1px solid var(--control-border); margin-top: 4px; border-radius: 0 0 5px 5px; }
 .menu-item.danger:hover { background: var(--danger-bg); }
 
-/* Reading width: a line of about 75 characters is easiest to read. */
-/* An explicit width keeps auto margins from shrinking panes in the phone's column layout. */
-.editor[data-view="edit"] #content { width: 100%; max-width: 80ch; margin: 0 auto; }
-.editor[data-view="preview"] #preview { width: 100%; max-width: 74ch; margin: 0 auto; }
+/* Put reading gutters inside the scrollable panes, not outside them. */
+.editor[data-view="edit"], .editor[data-view="preview"] { padding-inline: 0; }
+.editor[data-view="edit"] #content { width: 100%; padding-inline: max(32px, calc((100% - 80ch) / 2)); }
+.editor[data-view="preview"] #preview { width: 100%; padding-inline: max(32px, calc((100% - 74ch) / 2)); }
+.editor[data-view="live"] { padding-inline: 0; }
+.editor[data-view="live"] #live { width: 100%; padding-inline: max(32px, calc((100% - 74ch) / 2)); }
 #preview { line-height: 1.7; }
 #preview h3 { margin-top: 1.7em; }
 #preview > .earlier + h3, #preview > :first-child { margin-top: 0; }
 
-/* Phones: the way back stays in reach, and typing gets the whole screen. */
+/* Phones: keep the way back from the library in reach. */
 @media (max-width: 600px) {
   .books-head { position: sticky; top: 0; z-index: 5; margin: -16px -20px 14px; padding: 12px 20px; background: var(--page); border-bottom: 1px solid var(--border); }
   .books-head .tool { min-height: 40px; padding: 10px 14px; }
   .books-head .back { padding-right: 18px; font-size: 14px; }
-  body.typing aside { display: none; }
-}
-
-/* Phones: one compact strip. Books, Files and search share a row, the notes come next,
-   and the timer sums stay out of the way. Without this the notes list had no room. */
-@media (max-width: 600px) {
-  aside { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; max-height: none; }
-  aside > header { flex: 1 1 100%; }
-  .books-link { flex: 0 0 auto; width: auto; margin: 0; padding: 9px 12px; }
-  #search { flex: 1 1 110px; width: auto; min-width: 0; margin: 0; }
-  aside > nav { flex: 1 1 100%; min-height: 44px; }
-  aside > .timer { flex: 1 1 100%; }
-  aside > footer { flex: 1 1 100%; }
-  .timer-summary { display: none; }
-  .note-date { display: none; }
 }
 
 /* The Trash is a wire-mesh bin at the foot of the sidebar. It shows paper when it holds a note. */
@@ -442,11 +413,6 @@ body.collapsed aside > :not(header) { display: none; }
 body.collapsed aside > header { padding: 0; justify-content: center; }
 body.collapsed aside > header > :not(.head-actions) { display: none; }
 body.collapsed .head-actions > :not(.rail-toggle) { display: none; }
-@media (max-width: 600px) {
-  body.collapsed aside { width: 100%; padding: 6px 14px; }
-  body.collapsed aside > header { padding: 0; justify-content: space-between; }
-  body.collapsed aside > header > .brand { display: flex; }
-}
 
 /* The cheatsheet in the more menu. */
 .menu-cheat summary { list-style: none; }
@@ -464,3 +430,34 @@ body.collapsed .head-actions > :not(.rail-toggle) { display: none; }
 #fold-text { flex: 0 1 auto; }
 #fold-toggle { padding: 0; font-size: 12px; color: var(--link); background: none; border: 0; text-decoration: underline; text-underline-offset: 2px; }
 #fold-toggle:hover { color: var(--link-hover); background: none; }
+
+/* The daily note floats above every view and keeps its place. */
+.daily-note { position: fixed; z-index: 30; width: 260px; max-height: min(70vh, 520px); display: flex; flex-direction: column; color: var(--text); background: var(--surface); border: 1px solid var(--accent-border); border-radius: 10px; box-shadow: 0 12px 32px var(--menu-shadow); font-size: 13px; }
+.daily-note.dragging { opacity: .9; user-select: none; }
+.daily-note.complete { border-color: var(--success-border); }
+.daily-head { display: flex; align-items: center; gap: 8px; padding: 9px 8px 9px 14px; cursor: grab; touch-action: none; border-bottom: 1px solid var(--control-border); }
+.daily-note.dragging .daily-head { cursor: grabbing; }
+.daily-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--accent-text); }
+#daily-count { margin-right: auto; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.daily-note.complete #daily-count { color: var(--success); }
+#daily-close { width: 26px; height: 26px; font-size: 16px; color: var(--muted); }
+#daily-items { list-style: none; margin: 0; padding: 6px; overflow: auto; flex: 1; min-height: 0; }
+.daily-item { display: flex; align-items: flex-start; gap: 4px; border-radius: 6px; }
+.daily-item:hover { background: var(--hover); }
+.daily-item label { flex: 1; display: flex; align-items: flex-start; gap: 9px; padding: 6px 8px; cursor: pointer; overflow-wrap: anywhere; }
+.daily-item input { flex: none; width: 14px; height: 14px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+.daily-item.done span { color: var(--subtle); text-decoration: line-through; }
+.daily-remove { flex: none; width: 26px; height: 26px; margin-top: 2px; color: var(--muted); opacity: 0; }
+.daily-item:hover .daily-remove, .daily-remove:focus-visible { opacity: 1; }
+.daily-empty { padding: 8px; color: var(--subtle); }
+#daily-status { margin: 0; padding: 0 14px 6px; font-size: 11px; color: var(--danger); }
+#daily-form { padding: 8px; border-top: 1px solid var(--control-border); }
+#daily-input { width: 100%; padding: 7px 9px; font-size: 13px; color: var(--text); background: var(--page); border: 1px solid var(--control-border); border-radius: 6px; }
+#daily-input:focus { outline: none; border-color: var(--accent); }
+#daily-input::placeholder { color: var(--subtle); }
+.books-link.daily-link::before { content: '☑'; }
+@media (hover: none) { .daily-remove { opacity: 1; } }
+@media (max-width: 600px) {
+  .daily-note { left: 12px !important; right: 12px; top: auto !important; bottom: 12px; width: auto; max-height: 55vh; }
+  .daily-head { cursor: default; }
+}

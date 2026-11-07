@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191919">
+  <meta name="referrer" content="no-referrer">
+  <title>Agent Connections - Notes</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/agents.css">
+  <script src="/agents.js" type="module"></script>
+</head>
+<body class="agents-page">
+  <main class="agent-settings">
+    <a class="tool" href="/">Back to notes</a>
+    <div class="agent-intro"><span class="agent-eyebrow">YOUR NOTEBOOK, YOUR TOOLS</span><h1>Agent connections</h1><p>Connect an MCP-capable harness to the same Markdown notes you use here.</p></div>
+    <section class="agent-panel" aria-labelledby="endpoint-heading">
+      <h2 id="endpoint-heading">One notebook endpoint</h2>
+      <div class="agent-copy-row"><code id="mcp-url"></code><button id="copy-url" class="tool" type="button">Copy URL</button></div>
+      <p>Use <strong>Streamable HTTP</strong>. Clients with an OAuth connection flow will open this site for your approval. For a harness that accepts an authorization header, create a personal token below.</p>
+      <p>Access applies to <strong>all active notes</strong>, not a selected folder. Trashed notes, deletion, books, files, and time tracking are never available through MCP.</p>
+    </section>
+    <section class="agent-panel" aria-labelledby="create-heading">
+      <h2 id="create-heading">Create a personal token</h2>
+      <form id="agent-form">
+        <label class="agent-field" for="agent-name">Connection name<input id="agent-name" name="name" required maxlength="100" placeholder="For example, research harness" autocomplete="off"></label>
+        <fieldset id="agent-scopes"><legend>Permissions</legend>
+          <label><input type="checkbox" name="scope" value="notes:read"><span><strong>Read</strong>List, search, and read all active notes.</span></label>
+          <label><input type="checkbox" name="scope" value="notes:create" checked><span><strong>Create</strong>Write new notes without reading existing ones.</span></label>
+          <label><input type="checkbox" name="scope" value="notes:append"><span><strong>Append</strong>Add text to an existing note by its ID.</span></label>
+          <label><input type="checkbox" name="scope" value="notes:edit"><span><strong>Edit</strong>Replace note content using its current version. Usually paired with Read.</span></label>
+        </fieldset>
+        <label class="agent-field" for="agent-expiry">Expires after<select id="agent-expiry" name="expiry"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></label>
+        <label class="agent-consent"><input id="agent-consent" type="checkbox" required> I approve these permissions for my whole notebook.</label>
+        <button id="agent-create" class="tool" type="submit">Create token</button>
+      </form>
+      <div id="agent-secret" class="agent-secret" hidden>
+        <h3>Your token is shown once</h3><p>Keep it in your harness's secret store, not in a note or a committed config file. Anyone holding it has the permissions you selected.</p>
+        <label class="agent-field" for="agent-token">Personal token<input id="agent-token" readonly autocomplete="off" spellcheck="false"></label>
+        <div class="agent-copy-row"><button id="copy-token" class="tool" type="button">Copy token</button><button id="hide-token" class="tool" type="button">Hide token</button></div>
+        <p>Send it as <code>Authorization: Bearer &lt;token&gt;</code>. Header configuration varies by harness.</p>
+      </div>
+    </section>
+    <section class="agent-panel" aria-labelledby="connections-heading">
+      <div class="agent-section-head"><h2 id="connections-heading">Your connections</h2><button id="agent-refresh" class="tool" type="button">Refresh</button></div>
+      <p id="agent-status" role="status" aria-live="polite">Loading connections...</p>
+      <div id="agent-connections"></div>
+    </section>
+    <p class="agent-footnote">Only grant access to harnesses you trust. Note content is reference material, not permission to perform unrelated actions. Revoking a connection blocks its subsequent requests; it cannot recall data already read.</p>
+  </main>
+</body>
+</html>

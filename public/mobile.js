@@ -61,7 +61,7 @@
     const page = main.dataset.page;
     more.hidden = phone.matches && page !== 'notes';
     const label = page === 'notes' ? main.dataset.noteTitle || 'New note'
-      : { books: 'Books', files: 'Files', report: 'Time report', roadmap: 'Roadmap' }[page] || 'Notes';
+      : { books: 'Books', files: 'Files', report: 'Time report', interview: 'Interview prep' }[page] || 'Notes';
     if (title.textContent !== label) title.textContent = label;
     title.title = label;
   }

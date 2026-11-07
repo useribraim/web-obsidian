@@ -1,0 +1,19 @@
+{
+  "name": "web-obsidian",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dev": "wrangler dev --host 127.0.0.1:8787 --local-upstream 127.0.0.1:8787",
+    "deploy": "wrangler deploy",
+    "check:worker": "wrangler deploy --dry-run",
+    "lab": "node lab/dev.mjs"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bus lab — guide</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./lab.css">
+  <script type="module" src="./lab.js"></script>
+</head>
+<body>
+  <header class="lab-head">
+    <div class="lab-title">
+      <span class="eyebrow">lab</span>
+      <h1>Bus lab</h1>
+      <p>Write the live bus map by hand. Eight stages, one working page.</p>
+    </div>
+    <div class="lab-progress">
+      <progress id="progress" max="8" value="0" aria-label="Stages complete"></progress>
+      <span id="progress-text">0 / 8</span>
+      <button id="reset" type="button" class="quiet">Reset</button>
+    </div>
+  </header>
+
+  <main class="lab-grid">
+    <nav id="stage-list" class="stage-list" aria-label="Stages"></nav>
+
+    <article id="stage" class="stage" tabindex="-1"></article>
+
+    <aside class="preview">
+      <div class="preview-bar">
+        <span>Your map</span>
+        <div class="preview-actions">
+          <button id="reload" type="button" class="quiet">Refresh</button>
+          <a id="open" href="/app/" target="_blank" rel="noopener">Open ↗</a>
+        </div>
+      </div>
+      <iframe id="frame" src="/app/" title="Your bus map"></iframe>
+    </aside>
+  </main>
+</body>
+</html>

@@ -72,7 +72,7 @@
   #fold-text { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   #fold-toggle { flex: none; min-height: 32px; font-size: 11px; }
   #app-main > #editor { flex: 1 1 0; flex-direction: column; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 12px 20px 0; }
-  #editor > #content, #editor > #preview { width: 100%; max-width: none; margin: 0; padding: 0 0 max(32px, env(safe-area-inset-bottom, 0px)); border: 0; font-size: var(--note-size); line-height: 1.7; }
+  #editor > #content, #editor > #preview, #editor > #live { width: 100%; max-width: none; margin: 0; padding: 0 0 max(32px, env(safe-area-inset-bottom, 0px)); border: 0; font-size: var(--note-size); line-height: 1.7; }
   #editor > #preview { overflow-wrap: anywhere; }
   #app-main[data-page="notes"] { padding-bottom: env(safe-area-inset-bottom, 0px); }
   :root[data-theme="light"] .mobile-header,
