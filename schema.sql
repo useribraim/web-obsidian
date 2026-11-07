@@ -100,12 +100,10 @@ CREATE TABLE IF NOT EXISTS mcp_note_events (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS mcp_note_events_note ON mcp_note_events (note_id, created_at);
-CREATE TABLE IF NOT EXISTS roadmap_solves (
-  id TEXT PRIMARY KEY,
-  problem_key TEXT NOT NULL,
-  title TEXT NOT NULL,
-  language TEXT NOT NULL DEFAULT '',
-  solved_on TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+CREATE TABLE IF NOT EXISTS daily_list (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  items TEXT NOT NULL DEFAULT '[]',
+  done TEXT NOT NULL DEFAULT '[]',
+  done_on TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
-CREATE INDEX IF NOT EXISTS roadmap_solves_problem ON roadmap_solves (problem_key);

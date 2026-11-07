@@ -1,47 +1,47 @@
 /* Styles for the live editor. A hidden mark keeps its text in the page so the
    caret maps to the note, but it takes no room and shows nothing. */
-.live-view { position: relative; overflow: auto; padding: 0 26px 36px 0; outline: 0; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; font-size: calc(var(--note-size, 14px) + 2px); line-height: 1.65; caret-color: #d4d4d4; }
+.live-view { position: relative; overflow: auto; padding: 0 26px 36px 0; outline: 0; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; font-size: calc(var(--note-size, 14px) + 2px); line-height: 1.65; caret-color: var(--text); }
 .live-view .ll { position: relative; min-height: 1.65em; padding-left: calc(var(--indent, 0) * 1.5em); }
-.live-view ::selection { background: rgba(168, 153, 206, .35); }
+.live-view ::selection { background: var(--selection); }
 
 .live-view .live-hide { font-size: 0; letter-spacing: 0; }
-.live-view .live-mark { color: #7d7790; font-weight: 400; font-style: normal; text-decoration: none; }
+.live-view .live-mark { color: var(--subtle); font-weight: 400; font-style: normal; text-decoration: none; }
 
 .live-view .ll-heading { font-weight: 650; line-height: 1.25; margin: .5em 0 .2em; }
 .live-view .ll-h1 { font-size: 1.85em; }
 .live-view .ll-h2 { font-size: 1.5em; }
 .live-view .ll-h3 { font-size: 1.25em; }
-.live-view .ll-h4, .live-view .ll-h5, .live-view .ll-h6 { font-size: 1.05em; color: #b9b2c9; }
+.live-view .ll-h4, .live-view .ll-h5, .live-view .ll-h6 { font-size: 1.05em; color: var(--secondary); }
 
 .live-view .s-strong, .live-view .s-strong-em { font-weight: 650; }
 .live-view .s-em, .live-view .s-strong-em { font-style: italic; }
-.live-view .s-del { color: #8a8a8a; text-decoration: line-through; }
-.live-view .s-link { color: #b9a7e0; text-decoration: underline; }
-.live-view .s-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: #262626; border-radius: 4px; padding: .1em 0; }
+.live-view .s-del { color: var(--subtle); text-decoration: line-through; }
+.live-view .s-link { color: var(--link); text-decoration: underline; }
+.live-view .s-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: var(--code-chip); border-radius: 4px; padding: .1em 0; }
 
 /* Lists: the bullet is drawn, not typed, until the caret reaches the line. */
 .live-view .ll-list, .live-view .ll-task { padding-left: calc(1.5em + var(--indent, 0) * 1.5em); }
-.live-view .ll-list:not(.ll-ordered):not(.ll-active)::before { content: '•'; position: absolute; left: calc(.45em + var(--indent, 0) * 1.5em); color: #8a7ba7; }
+.live-view .ll-list:not(.ll-ordered):not(.ll-active)::before { content: '•'; position: absolute; left: calc(.45em + var(--indent, 0) * 1.5em); color: var(--accent); }
 .live-view .ll-ordered { padding-left: calc(.5em + var(--indent, 0) * 1.5em); }
-.live-view .live-box { position: absolute; left: calc(.1em + var(--indent, 0) * 1.5em); top: .35em; width: 1em; height: 1em; margin: 0; accent-color: #a899ce; cursor: pointer; }
+.live-view .live-box { position: absolute; left: calc(.1em + var(--indent, 0) * 1.5em); top: .35em; width: 1em; height: 1em; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .live-view .ll-task.ll-active .live-box { display: none; }
-.live-view .ll-done:not(.ll-active) { color: #8a8a8a; text-decoration: line-through; }
+.live-view .ll-done:not(.ll-active) { color: var(--subtle); text-decoration: line-through; }
 
-.live-view .ll-quote { padding-left: 1em; border-left: 3px solid #4a4159; color: #a9a2b8; }
-.live-view .ll-rule:not(.ll-active) { border-top: 1px solid #303030; margin: .6em 0; min-height: 0; line-height: 0; }
+.live-view .ll-quote { padding-left: 1em; border-left: 3px solid var(--accent-border); color: var(--muted); }
+.live-view .ll-rule:not(.ll-active) { border-top: 1px solid var(--hover); margin: .6em 0; min-height: 0; line-height: 0; }
 .live-view .ll-rule:not(.ll-active) .live-hide { line-height: 0; }
 
-.live-view .ll-code, .live-view .ll-fence { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: #161616; padding-left: 13px; }
-.live-view .ll-fence { color: #6f6a7d; }
+.live-view .ll-code, .live-view .ll-fence { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: var(--code-bg); padding-left: 13px; }
+.live-view .ll-fence { color: var(--subtle); }
 
 .live-view .live-image { display: block; margin: .4em 0; user-select: none; }
-.live-view .live-image img { display: block; max-width: 100%; max-height: 480px; height: auto; object-fit: contain; border: 1px solid #383838; border-radius: 10px; background: #191919; }
+.live-view .live-image img { display: block; max-width: 100%; max-height: 480px; height: auto; object-fit: contain; border: 1px solid var(--strong-border); border-radius: 10px; background: var(--sidebar); }
 .live-view .ll-image.ll-active .live-image { margin-top: .3em; }
 
 .live-view[aria-disabled="true"] { opacity: .6; }
 
-.live-view[data-empty]::before { content: attr(placeholder); position: absolute; top: 0; left: 0; color: #858585; pointer-events: none; }
+.live-view[data-empty]::before { content: attr(placeholder); position: absolute; top: 0; left: 0; color: var(--subtle); pointer-events: none; }
 .live-view > .ll-heading:first-child { margin-top: 0; }
 .live-view .live-inline-image { display: inline-block; vertical-align: middle; margin: 0 .2em; user-select: none; }
-.live-view .live-inline-image img { display: block; max-width: 100%; max-height: 160px; border: 1px solid #383838; border-radius: 8px; }
+.live-view .live-inline-image img { display: block; max-width: 100%; max-height: 160px; border: 1px solid var(--strong-border); border-radius: 8px; }
 .live-view .s-link { cursor: text; }

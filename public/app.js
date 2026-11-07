@@ -35,6 +35,24 @@ const restoreButton = document.querySelector('#restore');
 const purgeButton = document.querySelector('#purge');
 const viewButtons = [...document.querySelectorAll('.view-option')];
 const spellcheck = document.querySelector('#spellcheck');
+const themePicker = document.querySelector('#theme');
+const THEME_KEY = 'noteTheme';
+function applyTheme(theme) {
+  const colors = { light: '#f0eee6', dark: '#191919', forest: '#141e18', nord: '#272c36' };
+  const selected = Object.hasOwn(colors, theme) ? theme : 'dark';
+  document.documentElement.dataset.theme = selected;
+  document.querySelector('meta[name="theme-color"]').content = colors[selected];
+  themePicker.value = selected;
+}
+applyTheme(document.documentElement.dataset.theme);
+themePicker.addEventListener('change', () => {
+  const theme = themePicker.value;
+  applyTheme(theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
+});
+window.addEventListener('storage', event => {
+  if (event.key === THEME_KEY || event.key === null) applyTheme(event.newValue);
+});
 const unravelButton = document.querySelector('#unravel');
 // Notes open compact: the last day, and the rest behind a dropdown. The
 // quiet button beside the view buttons unravels the whole note. It is not
@@ -125,14 +143,23 @@ function renderInline(text) {
 // document order so a click in the preview can find its source line.
 const TASK = /^(\s*(?:[-*+]|\d+[.)])\s+)\[([ xX])\](\s+.*|)$/;
 let taskCount = 0;
-function renderItem(item) {
+function renderItem(item, nested = false) {
   const task = /^\[([ xX])\](?:\s+(.*)|)$/.exec(item);
   if (!task) return '<li>' + renderInline(item);
   const done = task[1] !== ' ';
   const index = taskCount;
   taskCount += 1;
-  return '<li class="task' + (done ? ' done' : '') + '"><input type="checkbox" data-task="' + index + '"' +
-    (done ? ' checked' : '') + (content.disabled ? ' disabled' : '') + '> ' + renderInline(task[2] || '');
+  const text = task[2] || '';
+  // The > shorthand also works when a paragraph separates a subtask from its
+  // parent. Indented Markdown tasks use the same secondary appearance.
+  const secondaryMarker = /^>(?:\s+(.*)|$)/.exec(text);
+  const secondary = nested || Boolean(secondaryMarker);
+  const label = secondaryMarker ? secondaryMarker[1] || '' : text;
+  return '<li class="task task-' + (secondary ? 'secondary' : 'primary') + (done ? ' done' : '') + '">' +
+    '<label class="task-label"><input type="checkbox" data-task="' + index + '"' +
+    (label ? '' : ' aria-label="' + (secondary ? 'Subtask' : 'Task') + '"') +
+    (done ? ' checked' : '') + (content.disabled ? ' disabled' : '') + '>' +
+    '<span class="task-text">' + renderInline(label) + '</span></label>';
 }
 // A run of list lines. Deeper indentation (a tab, or two spaces) opens a
 // nested list inside the item above it.
@@ -149,7 +176,7 @@ function renderList(lines) {
       html += '<' + tag + '>';
       open.push({ depth, tag });
     } else html += '</li>';
-    html += renderItem(parts[3]);
+    html += renderItem(parts[3], depth > 0);
   }
   while (open.length) html += '</li></' + open.pop().tag + '>';
   return html;
@@ -253,8 +280,34 @@ function renderMarkdown(source) {
   }
   return html;
 }
+// The first explicit pinned callout stays outside both scrolling panes.
+// Code examples containing the syntax must not become real reminders.
+function pinnedReminder(source) {
+  const lines = source.replace(/\r\n?/g, '\n').split('\n');
+  let fence = null;
+  for (let i = 0; i < lines.length; i += 1) {
+    const marker = /^\s*(`{3,}|~{3,})/.exec(lines[i]);
+    if (fence) {
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(lines[i].slice(marker[0].length))) fence = null;
+      continue;
+    }
+    if (marker) { fence = marker[1]; continue; }
+    const pin = /^\s{0,3}>\s*\[!pin\]\s*(.*)$/i.exec(lines[i]);
+    if (!pin) continue;
+    const text = [pin[1]];
+    while (i + 1 < lines.length && /^\s{0,3}>/.test(lines[i + 1])) {
+      text.push(lines[++i].replace(/^\s{0,3}>\s?/, ''));
+    }
+    return text.join('\n').trim();
+  }
+  return '';
+}
 function renderPreview() {
   syncLive();
+  const reminder = pinnedReminder(noteText());
+  const banner = document.querySelector('#pinned-note');
+  banner.hidden = !reminder;
+  if (banner.textContent !== reminder) banner.textContent = reminder;
   if (editor.dataset.view === 'edit' || editor.dataset.view === 'live') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());

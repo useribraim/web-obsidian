@@ -46,7 +46,7 @@ Updates check the expected version and reject stale writes. Appends are atomic
 and increment the version, so a browser with older content cannot silently
 overwrite them. Existing note limits apply: 200 title characters and 200,000
 content characters. Agent writes are attributed in `mcp_note_events`.
-Trashed notes, deletion, images, books, files, roadmap progress, and the time
+Trashed notes, deletion, images, books, files, the daily list, and the time
 tracker are not exposed. The page may need to reopen a note to show an agent's
 latest edit; this is not a collaborative live editor.
 
@@ -80,7 +80,11 @@ refresh, and replay revocation against an isolated local Wrangler database.
 
 ## Notes
 
-- The toolbar keeps the save status, the view buttons (**Edit**, **Live**, **Split**, **Preview**), the unravel arrow and **Image** in the open. A note saves by itself, so there is no Save button; ⌘S saves at once, and ⌘B and ⌘I still make bold and italic. The **⋯** menu holds **Focus mode**, **Spell check**, a **Markdown cheatsheet** and **Delete**. Delete still asks first.
+- The app opens in a dark theme. Choose **Light**, **Dark**, **Forest** or **Nord** with **Theme** in the **⋯** menu. The choice is remembered on this browser, including the sign-in page. The book reader keeps its own **Dark** / **Light** choice.
+
+- The toolbar keeps the save status, the view buttons (**Edit**, **Live**, **Split**, **Preview**), the unravel arrow and **Image** in the open. A note saves by itself, so there is no Save button; ⌘S saves at once, and ⌘B and ⌘I still make bold and italic. The **⋯** menu holds **Focus mode**, **Theme**, **Spell check**, a **Markdown cheatsheet** and **Delete**. Delete still asks first.
+
+- **Daily** in the sidebar, or ⌘J, shows a note that floats above every page. It lists the tasks you do every day. Ticks clear on each new day, and the list is stored in D1 (`daily_list`), so every device shows the same list. Drag the header to move the note.
 - The box above the list searches titles and text. Each note shows when it was last edited. In **Edit** and **Preview** the text sits in a column of about 75 characters.
 
 - Markdown source on the left, live preview on the right.
@@ -95,6 +99,11 @@ refresh, and replay revocation against an isolated local Wrangler database.
   box to tick a task. The view is in `public/live-view.js` and `public/tokenizer.js`.
   The textarea stays the source of the note, so saving, folding and the shortcuts
   work as in **Edit**.
+- Primary tasks use `- [ ] task`. For a secondary task, write `- [ ] > subtask`
+  or indent a task with a tab or two spaces. Secondary tasks have smaller,
+  indented checkboxes; the `>` stays in the source and is hidden in the preview.
+  Each checkbox changes only its own task. A completed parent does not cross out
+  unfinished subtasks. Click a task's text or its checkbox to tick it.
 - Open the **⋯** menu and tick **Focus mode** to show only the Markdown, the preview and the timer. The
   choice stays after a reload, until you untick it.
 - Notes with day headings open compact, every time. Only the last day stays

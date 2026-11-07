@@ -14,7 +14,7 @@ main[data-page="interview"] > .interview { display: block; }
 .interview-card p { font-size: 13px; line-height: 1.7; color: var(--prep-muted); }
 #interview-setup > p { margin: 0 0 24px; }
 #interview-setup label { display: block; color: var(--prep-accent); font-size: 12px; margin-bottom: 8px; }
-#interview-topic, #interview-difficulty { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--prep-border); border-radius: 7px; background: var(--background, #1e1e1e); color: inherit; font: inherit; font-size: 14px; }
+#interview-topic, #interview-difficulty { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--prep-border); border-radius: 7px; background: var(--page, #1e1e1e); color: inherit; font: inherit; font-size: 14px; }
 #interview-topic:focus-visible, #interview-difficulty:focus-visible { outline: 2px solid var(--accent, #a899ce); outline-offset: 2px; }
 label[for="interview-difficulty"] { margin-top: 18px; }
 .interview-drill { margin: 24px 0; }

@@ -124,7 +124,7 @@ export default async function testInterview(page, files) {
   assert(await page.locator('#interview-note').isHidden(), 'Perfect round has no empty note');
   assert(notes.size === 2, 'Perfect round creates no note');
   assert(writes === 3, 'Only mistake rounds use the save API');
-  for (const target of ['books', 'files', 'roadmap', 'interview']) {
+  for (const target of ['books', 'files', 'interview']) {
     await page.evaluate(value => { location.hash = '#/' + value; }, target);
     await visiblePage(target);
   }

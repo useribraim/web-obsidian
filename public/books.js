@@ -36,7 +36,7 @@
   const SIDEBAR_KEY = 'bookSidebar';
   const THEMES = {
     dark: { html: { background: '#1e1e1e !important' }, body: { background: '#1e1e1e !important', color: '#d4d4d4 !important', 'line-height': '1.6 !important' }, 'p, div, span, li, blockquote, h1, h2, h3, h4, h5, h6': { color: '#d4d4d4 !important' }, a: { color: '#b9a7e0 !important' } },
-    light: { html: { background: '#f6f3ec !important' }, body: { background: '#f6f3ec !important', color: '#222 !important', 'line-height': '1.6 !important' }, 'p, div, span, li, blockquote, h1, h2, h3, h4, h5, h6': { color: '#222 !important' }, a: { color: '#5a3fa0 !important' } },
+    light: { html: { background: '#faf9f5 !important' }, body: { background: '#faf9f5 !important', color: '#292824 !important', 'line-height': '1.6 !important' }, 'p, div, span, li, blockquote, h1, h2, h3, h4, h5, h6': { color: '#292824 !important' }, a: { color: '#96482f !important' } },
   };
 
   let books = [];
@@ -49,7 +49,7 @@
   let saveTimer = 0;
   const stored = (key, fallback) => { try { return localStorage.getItem(key) || fallback; } catch { return fallback; } };
   const remember = (key, value) => { try { localStorage.setItem(key, value); } catch {} };
-  let theme = stored(THEME_KEY, 'dark') === 'light' ? 'light' : 'dark';
+  let theme = stored(THEME_KEY, document.documentElement.dataset.theme || 'light') === 'dark' ? 'dark' : 'light';
   let fontPercent = Math.min(200, Math.max(70, Number(stored(FONT_KEY, '110')) || 110));
   let night = stored(NIGHT_KEY, '0') === '1';
   let zoom = Math.min(3, Math.max(0.5, Number(stored(ZOOM_KEY, '1')) || 1));
