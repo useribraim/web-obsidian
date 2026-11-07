@@ -21,3 +21,11 @@ test('first pin wins, and removing it clears the reminder', () => {
   assert.equal(reminder('> [!pin] First\n\n> [!pin] Second'), 'First');
   assert.equal(reminder(''), '');
 });
+test('the pin end is the offset after the last line of the callout', () => {
+  const at = runInNewContext(source.slice(start, end) + '\npinnedReminderAt');
+  const one = '# Plan\n> [!pin] Read\nmore';
+  assert.equal(at(one).end, one.indexOf('Read') + 4);
+  const many = 'a\r\n> [!pin] One\r\n> Two\r\n\r\nb';
+  assert.equal(at(many).end, many.indexOf('Two') + 3);
+  assert.equal(at('```\n> [!pin] x\n```').end, -1);
+});
