@@ -24,6 +24,8 @@ function syncLive() {
     window.getSelection().focusNode?.parentElement?.scrollIntoView({ block: 'nearest' });
   }
 }
+const pinnedNote = document.querySelector('#pinned-note');
+const pinnedText = document.querySelector('#pinned-text');
 const list = document.querySelector('#notes');
 const status = document.querySelector('#status');
 const newButton = document.querySelector('#new');
@@ -282,32 +284,41 @@ function renderMarkdown(source) {
 }
 // The first explicit pinned callout stays outside both scrolling panes.
 // Code examples containing the syntax must not become real reminders.
-function pinnedReminder(source) {
-  const lines = source.replace(/\r\n?/g, '\n').split('\n');
+// The end is the offset just after the callout's last line, where an edit starts.
+function pinnedReminder(source) { return pinnedReminderAt(source).text; }
+function pinnedReminderAt(source) {
+  const lines = source.split('\n');
   let fence = null;
-  for (let i = 0; i < lines.length; i += 1) {
-    const marker = /^\s*(`{3,}|~{3,})/.exec(lines[i]);
+  let offset = 0;
+  for (let i = 0; i < lines.length; offset += lines[i].length + 1, i += 1) {
+    const line = lines[i].replace(/\r$/, '');
+    const marker = /^\s*(`{3,}|~{3,})/.exec(line);
     if (fence) {
-      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(lines[i].slice(marker[0].length))) fence = null;
+      if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && /^\s*$/.test(line.slice(marker[0].length))) fence = null;
       continue;
     }
     if (marker) { fence = marker[1]; continue; }
-    const pin = /^\s{0,3}>\s*\[!pin\]\s*(.*)$/i.exec(lines[i]);
+    const pin = /^\s{0,3}>\s*\[!pin\]\s*(.*)$/i.exec(line);
     if (!pin) continue;
+    const start = offset;
     const text = [pin[1]];
+    let end = offset + line.length;
     while (i + 1 < lines.length && /^\s{0,3}>/.test(lines[i + 1])) {
-      text.push(lines[++i].replace(/^\s{0,3}>\s?/, ''));
+      offset += lines[i].length + 1;
+      i += 1;
+      const next = lines[i].replace(/\r$/, '');
+      text.push(next.replace(/^\s{0,3}>\s?/, ''));
+      end = offset + next.length;
     }
-    return text.join('\n').trim();
+    return { text: text.join('\n').trim(), start, end };
   }
-  return '';
+  return { text: '', end: -1 };
 }
 function renderPreview() {
   syncLive();
   const reminder = pinnedReminder(noteText());
-  const banner = document.querySelector('#pinned-note');
-  banner.hidden = !reminder;
-  if (banner.textContent !== reminder) banner.textContent = reminder;
+  pinnedNote.hidden = !reminder;
+  if (pinnedText.textContent !== reminder) pinnedText.textContent = reminder;
   if (editor.dataset.view === 'edit' || editor.dataset.view === 'live') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());
@@ -651,10 +662,12 @@ function toggleTasks() {
   else content.setSelectionRange(start, start + text.length);
 }
 function replaceSelection(text, start, end) {
-  // In Live view the textarea is hidden and cannot take typing, so the text goes
-  // in directly, and the input event copies it to the live view.
+  // Formatting belongs to the live history. Assigning a new live value
+  // through the hidden textarea would erase all preceding undo steps.
   if (editor.dataset.view === 'live') {
-    content.setRangeText(text, start, end, 'end');
+    live.setRangeText(text, start, end, 'end');
+    content.value = live.value;
+    content.setSelectionRange(live.selectionStart, live.selectionEnd);
     content.dispatchEvent(new Event('input', { bubbles: true }));
     return;
   }
@@ -866,6 +879,7 @@ function resetDraft() {
   showReport(false);
   clearTimeout(timer);
   current = null;
+  closePinnedEditor();
   restoreWeekPick(null);
   foldedSource = '';
   content.value = '';
@@ -1188,6 +1202,71 @@ function toggleUnravel() {
   resplitSource();
 }
 unravelButton.addEventListener('click', toggleUnravel);
+// Edit the callout in place without unfolding history or moving either pane.
+const pinnedForm = document.querySelector('#pinned-form');
+const pinnedInput = document.querySelector('#pinned-input');
+const pinnedEdit = document.querySelector('#pinned-edit');
+let pinnedDraft = null;
+function closePinnedEditor() {
+  pinnedDraft = null;
+  pinnedForm.hidden = true;
+  pinnedText.hidden = false;
+  pinnedEdit.hidden = false;
+}
+function editPinnedReminder() {
+  if (mode !== 'active' || !current || blocked || busy) return;
+  const pin = pinnedReminderAt(noteText());
+  if (pin.end < 0) return;
+  pinnedDraft = { id: current.id, original: noteText().slice(pin.start, pin.end) };
+  pinnedInput.value = pin.text;
+  pinnedInput.setCustomValidity('');
+  pinnedForm.hidden = false;
+  pinnedText.hidden = true;
+  pinnedEdit.hidden = true;
+  pinnedInput.focus();
+}
+pinnedEdit.addEventListener('click', editPinnedReminder);
+document.querySelector('#pinned-cancel').addEventListener('click', () => {
+  closePinnedEditor();
+  pinnedEdit.focus();
+});
+pinnedInput.addEventListener('input', () => pinnedInput.setCustomValidity(''));
+pinnedForm.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closePinnedEditor();
+    pinnedEdit.focus();
+  }
+});
+pinnedForm.addEventListener('submit', event => {
+  event.preventDefault();
+  if (!pinnedDraft || current?.id !== pinnedDraft.id || mode !== 'active' || blocked || busy) return;
+  const source = noteText();
+  const pin = pinnedReminderAt(source);
+  if (source.slice(pin.start, pin.end) !== pinnedDraft.original) {
+    pinnedInput.setCustomValidity('The reminder changed. Cancel and reopen it to edit the latest text.');
+    pinnedInput.reportValidity();
+    return;
+  }
+  const text = pinnedInput.value.trim();
+  const replacement = '> [!pin] ' + text.split('\n').join('\n> ');
+  const updated = source.slice(0, pin.start) + replacement + source.slice(pin.end);
+  if (!text || updated.length > 200000) {
+    pinnedInput.setCustomValidity(text ? 'The note exceeds the 200,000 character limit.' : 'Enter a reminder.');
+    pinnedInput.reportValidity();
+    return;
+  }
+  const scroll = content.scrollTop;
+  const selection = [content.selectionStart, content.selectionEnd];
+  setNoteText(updated);
+  content.setSelectionRange(...selection);
+  closePinnedEditor();
+  content.dispatchEvent(new Event('input', { bubbles: true }));
+  content.scrollTop = scroll;
+  pinnedEdit.focus();
+});
+document.addEventListener('note-shown', closePinnedEditor);
+
 foldToggle.addEventListener('click', toggleUnravel);
 showUnraveled();
 // Starting a new day changes what the preview folds. The editor catches up when
@@ -1196,7 +1275,9 @@ showUnraveled();
 const REFOLD_PAUSE = 800;
 let refoldTimer;
 function refoldKeepingCaret() {
-  if (unraveled) return;
+  // Replacing the live buffer clears its undo stack. Keep its source stable
+  // while editing; compact mode is restored when the note is opened again.
+  if (unraveled || editor.dataset.view === 'live') return;
   const split = Math.max(0, openFromOffset(noteText()));
   if (split === foldedSource.length) return;
   const caret = content.selectionEnd + foldedSource.length;
