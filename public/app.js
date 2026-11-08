@@ -300,6 +300,7 @@ function pinnedReminderAt(source) {
     if (marker) { fence = marker[1]; continue; }
     const pin = /^\s{0,3}>\s*\[!pin\]\s*(.*)$/i.exec(line);
     if (!pin) continue;
+    const start = offset;
     const text = [pin[1]];
     let end = offset + line.length;
     while (i + 1 < lines.length && /^\s{0,3}>/.test(lines[i + 1])) {
@@ -309,7 +310,7 @@ function pinnedReminderAt(source) {
       text.push(next.replace(/^\s{0,3}>\s?/, ''));
       end = offset + next.length;
     }
-    return { text: text.join('\n').trim(), end };
+    return { text: text.join('\n').trim(), start, end };
   }
   return { text: '', end: -1 };
 }
@@ -876,6 +877,7 @@ function resetDraft() {
   showReport(false);
   clearTimeout(timer);
   current = null;
+  closePinnedEditor();
   restoreWeekPick(null);
   foldedSource = '';
   content.value = '';
@@ -1198,30 +1200,70 @@ function toggleUnravel() {
   resplitSource();
 }
 unravelButton.addEventListener('click', toggleUnravel);
-// The pen on the pinned banner opens the callout in the editor, with the caret
-// at the end of its last line. Folded days unfold first if the pin is among them.
+// Edit the callout in place without unfolding history or moving either pane.
+const pinnedForm = document.querySelector('#pinned-form');
+const pinnedInput = document.querySelector('#pinned-input');
+const pinnedEdit = document.querySelector('#pinned-edit');
+let pinnedDraft = null;
+function closePinnedEditor() {
+  pinnedDraft = null;
+  pinnedForm.hidden = true;
+  pinnedText.hidden = false;
+  pinnedEdit.hidden = false;
+}
 function editPinnedReminder() {
-  if (mode !== 'active' || !current) return;
-  const { end } = pinnedReminderAt(noteText());
-  if (end < 0) return;
-  if (end < foldedSource.length) { unraveled = true; showUnraveled(); resplitSource(); }
-  if (editor.dataset.view === 'preview') document.querySelector('.view-option[data-view="edit"]').click();
-  const offset = end - foldedSource.length;
-  if (editor.dataset.view === 'live') {
-    syncLive();
-    live.focus();
-    live.setSelectionRange(offset, offset);
-    content.setSelectionRange(offset, offset);
-    window.getSelection().focusNode?.parentElement?.scrollIntoView({ block: 'center' });
+  if (mode !== 'active' || !current || blocked || busy) return;
+  const pin = pinnedReminderAt(noteText());
+  if (pin.end < 0) return;
+  pinnedDraft = { id: current.id, original: noteText().slice(pin.start, pin.end) };
+  pinnedInput.value = pin.text;
+  pinnedInput.setCustomValidity('');
+  pinnedForm.hidden = false;
+  pinnedText.hidden = true;
+  pinnedEdit.hidden = true;
+  pinnedInput.focus();
+}
+pinnedEdit.addEventListener('click', editPinnedReminder);
+document.querySelector('#pinned-cancel').addEventListener('click', () => {
+  closePinnedEditor();
+  pinnedEdit.focus();
+});
+pinnedInput.addEventListener('input', () => pinnedInput.setCustomValidity(''));
+pinnedForm.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closePinnedEditor();
+    pinnedEdit.focus();
+  }
+});
+pinnedForm.addEventListener('submit', event => {
+  event.preventDefault();
+  if (!pinnedDraft || current?.id !== pinnedDraft.id || mode !== 'active' || blocked || busy) return;
+  const source = noteText();
+  const pin = pinnedReminderAt(source);
+  if (source.slice(pin.start, pin.end) !== pinnedDraft.original) {
+    pinnedInput.setCustomValidity('The reminder changed. Cancel and reopen it to edit the latest text.');
+    pinnedInput.reportValidity();
     return;
   }
-  content.focus();
-  content.setSelectionRange(offset, offset);
-  movedByCode.add(content);
-  content.scrollTop = Math.max(0, sourceOffsetTop(offset) - content.clientHeight / 3);
-  requestAnimationFrame(() => requestAnimationFrame(() => movedByCode.delete(content)));
-}
-document.querySelector('#pinned-edit').addEventListener('click', editPinnedReminder);
+  const text = pinnedInput.value.trim();
+  const replacement = '> [!pin] ' + text.split('\n').join('\n> ');
+  const updated = source.slice(0, pin.start) + replacement + source.slice(pin.end);
+  if (!text || updated.length > 200000) {
+    pinnedInput.setCustomValidity(text ? 'The note exceeds the 200,000 character limit.' : 'Enter a reminder.');
+    pinnedInput.reportValidity();
+    return;
+  }
+  const scroll = content.scrollTop;
+  const selection = [content.selectionStart, content.selectionEnd];
+  setNoteText(updated);
+  content.setSelectionRange(...selection);
+  closePinnedEditor();
+  content.dispatchEvent(new Event('input', { bubbles: true }));
+  content.scrollTop = scroll;
+  pinnedEdit.focus();
+});
+document.addEventListener('note-shown', closePinnedEditor);
 
 foldToggle.addEventListener('click', toggleUnravel);
 showUnraveled();
