@@ -322,7 +322,24 @@ function renderPreview() {
   if (editor.dataset.view === 'edit' || editor.dataset.view === 'live') return;
   taskCount = 0;
   preview.innerHTML = renderMarkdown(noteText());
+  markMissedTasks();
   if (!unraveled) foldEarlierWeeks();
+}
+// A task that is still open after its day has ended is marked as missed. Only
+// tasks under a dated day heading count, and today's tasks are never missed.
+function markMissedTasks() {
+  const nodes = [...preview.children];
+  const headings = nodes.filter(node => /^H[1-6]$/.test(node.tagName));
+  const dates = NoteWeeks.assignDates(headings.map(node => node.textContent));
+  const dateOf = new Map(headings.map((node, index) => [node, dates[index]]));
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  let past = false;
+  for (const node of nodes) {
+    if (dateOf.has(node)) { const date = dateOf.get(node); past = Boolean(date) && date.getTime() < today; continue; }
+    if (!past) continue;
+    for (const task of node.querySelectorAll('li.task:not(.done)')) task.classList.add('missed');
+  }
 }
 // Compact mode shows the last day of a note, and puts every earlier day in a
 // dropdown, grouped by week and month. A day heading ("### 9/28") carries the date; weeks.js
