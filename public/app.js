@@ -662,10 +662,12 @@ function toggleTasks() {
   else content.setSelectionRange(start, start + text.length);
 }
 function replaceSelection(text, start, end) {
-  // In Live view the textarea is hidden and cannot take typing, so the text goes
-  // in directly, and the input event copies it to the live view.
+  // Formatting belongs to the live history. Assigning a new live value
+  // through the hidden textarea would erase all preceding undo steps.
   if (editor.dataset.view === 'live') {
-    content.setRangeText(text, start, end, 'end');
+    live.setRangeText(text, start, end, 'end');
+    content.value = live.value;
+    content.setSelectionRange(live.selectionStart, live.selectionEnd);
     content.dispatchEvent(new Event('input', { bubbles: true }));
     return;
   }
@@ -1273,7 +1275,9 @@ showUnraveled();
 const REFOLD_PAUSE = 800;
 let refoldTimer;
 function refoldKeepingCaret() {
-  if (unraveled) return;
+  // Replacing the live buffer clears its undo stack. Keep its source stable
+  // while editing; compact mode is restored when the note is opened again.
+  if (unraveled || editor.dataset.view === 'live') return;
   const split = Math.max(0, openFromOffset(noteText()));
   if (split === foldedSource.length) return;
   const caret = content.selectionEnd + foldedSource.length;

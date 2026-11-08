@@ -33,6 +33,7 @@
     const redoStack = [];
     let lastKind = '';
     let lastTime = 0;
+    let lastCaret = -1;
 
     host.classList.add('live-view');
     host.setAttribute('role', 'textbox');
@@ -286,9 +287,10 @@
 
     function remember(kind) {
       const now = performance.now();
-      const continuing = kind === 'insertText' && lastKind === 'insertText' && now - lastTime < TYPING_PAUSE;
+      const selection = readSelection() || [text.length, text.length];
+      const continuing = kind === 'insertText' && lastKind === 'insertText' && now - lastTime < TYPING_PAUSE && selection[0] === lastCaret && selection[1] === lastCaret;
       if (!continuing) {
-        undoStack.push({ text, selection: readSelection() || [text.length, text.length] });
+        undoStack.push({ text, selection });
         if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
       }
       redoStack.length = 0;
@@ -305,6 +307,7 @@
       remember(kind);
       applyEdit(a, b, insert);
       writeSelection(caret, caret);
+      lastCaret = caret;
       syncReveal();
       announce(kind);
     }
@@ -398,7 +401,7 @@
         }
         return;
       }
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || composing) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || composing || disabled) return;
       const key = event.key.toLowerCase();
       if (key === 'z' && !event.shiftKey) travel(undoStack, redoStack);
       else if ((key === 'z' && event.shiftKey) || (key === 'y' && event.ctrlKey)) travel(redoStack, undoStack);
@@ -436,11 +439,15 @@
       drawAll();
       if (selection) writeSelection(selection[0], selection[1]);
       else writeSelection(text.length, text.length);
-      remember('composition');
+      lastKind = '';
       announce('insertCompositionText');
     }
 
-    host.addEventListener('compositionstart', () => { composing = true; });
+    host.addEventListener('compositionstart', () => {
+      if (disabled) return;
+      remember('composition');
+      composing = true;
+    });
     host.addEventListener('compositionend', () => {
       composing = false;
       adoptDom();
